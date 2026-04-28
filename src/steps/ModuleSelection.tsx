@@ -8,8 +8,10 @@ import { MODULES } from "@/data/modules";
 import { moduleIcons } from "@/lib/icons";
 import { formatCHF } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useToast } from "@/lib/toast";
 import { clsx } from "@/lib/clsx";
-import type { Priority } from "@/data/types";
+import type { Priority, ModuleId } from "@/data/types";
 
 const priorityTone: Record<Priority, "danger" | "gold" | "muted"> = {
   Critical: "danger",
@@ -18,7 +20,20 @@ const priorityTone: Record<Priority, "danger" | "gold" | "muted"> = {
 };
 
 export const ModuleSelection = () => {
+  useDocumentTitle("Step 2 — Renovation Plan");
   const { selectedModules, toggleModule } = useStore();
+  const toast = useToast();
+  const handleToggle = (id: ModuleId) => {
+    const wasSelected = selectedModules.includes(id);
+    const mod = MODULES.find((m) => m.id === id);
+    toggleModule(id);
+    if (mod) {
+      toast(
+        wasSelected ? `Removed ${mod.name}` : `Added ${mod.name}`,
+        wasSelected ? "info" : "success",
+      );
+    }
+  };
   const totalCost = MODULES.filter((m) => selectedModules.includes(m.id)).reduce(
     (s, m) => s + m.estCost,
     0,
@@ -48,14 +63,14 @@ export const ModuleSelection = () => {
                 sel ? "border-teal bg-teal/[0.03]" : "hover:border-ink/20",
               )}
               hoverable={!sel}
-              onClick={() => toggleModule(m.id)}
+              onClick={() => handleToggle(m.id)}
               role="button"
               aria-pressed={sel}
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  toggleModule(m.id);
+                  handleToggle(m.id);
                 }
               }}
             >

@@ -6,6 +6,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { StepNav } from "@/components/StepNav";
 import { SUBSIDIES } from "@/data/subsidies";
 import { formatCHF } from "@/lib/format";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 const statusTone = {
   "Pre-qualified": "emerald",
@@ -14,6 +15,7 @@ const statusTone = {
 } as const;
 
 export const SubsidyView = () => {
+  useDocumentTitle("Step 4 — Subsidies");
   const total = SUBSIDIES.reduce((s, sub) => s + sub.amount, 0);
   const filed = SUBSIDIES.filter((s) => s.auto).length;
 

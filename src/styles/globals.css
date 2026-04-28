@@ -95,3 +95,58 @@
     @apply bg-muted/40;
   }
 }
+
+/* Print: clean one-page renovation report */
+@media print {
+  @page {
+    margin: 18mm;
+    size: A4;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000;
+  }
+
+  /* Hide chrome */
+  aside,
+  header.sticky,
+  nav,
+  .no-print,
+  button {
+    display: none !important;
+  }
+
+  /* Reset layout */
+  main,
+  .step-enter {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    animation: none !important;
+  }
+
+  /* Cards: no shadows, simpler borders, smaller paddings */
+  [class*="rounded-xl"],
+  [class*="rounded-2xl"] {
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  /* Preserve dark accent panels in print */
+  .print\:keep-bg {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Compact spacing */
+  h2 {
+    margin-bottom: 8mm !important;
+  }
+
+  /* Avoid splitting lists awkwardly */
+  ol,
+  ul {
+    page-break-inside: avoid;
+  }
+}

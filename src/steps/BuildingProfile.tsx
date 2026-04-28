@@ -7,20 +7,32 @@ import { StepNav } from "@/components/StepNav";
 import { BUILDING } from "@/data/building";
 import { formatCHF, formatNumber } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export const BuildingProfile = () => {
+  useDocumentTitle("Step 1 — Building Profile");
   const { address } = useStore();
   const b = BUILDING;
 
-  const facts = [
+  const facts: Array<{
+    icon: typeof MapPin;
+    label: string;
+    value: string;
+    tone?: "danger" | "warning";
+  }> = [
     { icon: MapPin, label: "Address", value: address },
     { icon: Calendar, label: "Year / Type", value: `${b.year} · ${b.type} · ${b.area} m²` },
-    { icon: Flame, label: "Heating", value: b.heating, tone: "warning" },
+    { icon: Flame, label: "Heating", value: b.heating, tone: "danger" },
     { icon: Layers, label: "Insulation", value: b.insulation, tone: "warning" },
     { icon: AppWindow, label: "Windows", value: b.windows, tone: "warning" },
     { icon: Home, label: "Roof", value: b.roof, tone: "warning" },
     { icon: Box, label: "Basement", value: b.basement, tone: "warning" },
   ];
+
+  const toneClass = {
+    danger: "text-danger",
+    warning: "text-warning",
+  } as const;
 
   return (
     <>
@@ -42,7 +54,7 @@ export const BuildingProfile = () => {
                 <div className="text-[11px] uppercase tracking-wider text-muted">{f.label}</div>
                 <div
                   className={`mt-0.5 text-sm font-semibold ${
-                    f.tone === "warning" ? "text-warning" : "text-navy"
+                    f.tone ? toneClass[f.tone] : "text-navy"
                   }`}
                 >
                   {f.value}
@@ -55,7 +67,7 @@ export const BuildingProfile = () => {
 
       <Card className="mt-4 p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-serif text-base text-navy">GEAK energy rating</h3>
+          <h3 className="font-serif text-base font-bold text-navy">GEAK energy rating</h3>
           <span className="text-[11px] uppercase tracking-wider text-muted">After renovation target</span>
         </div>
         <GeakBar current={b.geakClass} target="B" />

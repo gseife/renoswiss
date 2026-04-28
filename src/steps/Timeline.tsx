@@ -3,6 +3,7 @@ import { Stat } from "@/components/ui/Stat";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { StepNav } from "@/components/StepNav";
 import { useStore } from "@/lib/store";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { clsx } from "@/lib/clsx";
 
 type Status = "done" | "current" | "upcoming";
@@ -16,6 +17,7 @@ interface Step {
 }
 
 export const Timeline = () => {
+  useDocumentTitle("Step 6 — Timeline");
   const { selectedModules } = useStore();
 
   const steps: Step[] = [

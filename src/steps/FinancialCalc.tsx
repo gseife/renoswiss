@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/Card";
+import { KPI } from "@/components/ui/KPI";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { StepNav } from "@/components/StepNav";
 import { MODULES } from "@/data/modules";
@@ -7,8 +8,10 @@ import { SUBSIDIES } from "@/data/subsidies";
 import { formatCHF } from "@/lib/format";
 import { calcFinance } from "@/lib/finance";
 import { useStore } from "@/lib/store";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export const FinancialCalc = () => {
+  useDocumentTitle("Step 5 — Calculator");
   const { selectedModules, selectedContractors } = useStore();
   const [rate, setRate] = useState(1.85);
   const [term, setTerm] = useState(15);
@@ -51,8 +54,8 @@ export const FinancialCalc = () => {
       />
 
       <Card className="p-5">
-        <h3 className="text-sm font-semibold text-navy">Cost overview</h3>
-        <dl className="mt-4 space-y-2 text-sm">
+        <h3 className="mb-4 font-serif text-base font-bold text-navy">Cost overview</h3>
+        <dl className="space-y-2 text-sm">
           <Line label="Total renovation cost" value={formatCHF(totalCost)} bold />
           <Line label="Subsidies (pre-qualified)" value={`− ${formatCHF(totalSubsidies)}`} positive />
         </dl>
@@ -76,7 +79,7 @@ export const FinancialCalc = () => {
       </Card>
 
       <Card className="mt-3 p-5">
-        <h3 className="mb-4 text-sm font-semibold text-navy">Financing parameters</h3>
+        <h3 className="mb-4 font-serif text-base font-bold text-navy">Financing parameters</h3>
         <div className="space-y-5">
           <Slider label="Interest rate" value={`${rate}%`} min={1} max={3.5} step={0.05} val={rate} onChange={setRate} />
           <Slider label="Loan term" value={`${term} years`} min={5} max={25} step={1} val={term} onChange={setTerm} />
@@ -101,7 +104,7 @@ export const FinancialCalc = () => {
       </Card>
 
       <Card className="mt-3 p-5">
-        <h3 className="mb-3 text-sm font-semibold text-navy">Long-term value</h3>
+        <h3 className="mb-4 font-serif text-base font-bold text-navy">Long-term value</h3>
         <div className="grid grid-cols-3 gap-2">
           <KPI label="Property uplift" value={formatCHF(result.propertyIncrease)} tone="emerald" />
           <KPI label="Annual energy savings" value={formatCHF(annualEnergySaving)} tone="teal" />
@@ -184,15 +187,3 @@ const Slider = ({
   </div>
 );
 
-const kpiTone = {
-  emerald: "bg-emerald/10 text-emerald",
-  teal: "bg-teal/10 text-teal",
-  navy: "bg-canvas text-navy",
-} as const;
-
-const KPI = ({ label, value, tone }: { label: string; value: string; tone: keyof typeof kpiTone }) => (
-  <div className={`rounded-lg px-2 py-3 text-center ${kpiTone[tone]}`}>
-    <div className="font-serif text-base font-bold leading-tight">{value}</div>
-    <div className="mt-0.5 text-[10px] opacity-80">{label}</div>
-  </div>
-);

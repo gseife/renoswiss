@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ShieldCheck, MapPin, Sparkles } from "lucide-react";
+import { Check, ChevronDown, ShieldCheck, MapPin, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -12,20 +12,43 @@ import { CONTRACTORS } from "@/data/contractors";
 import { moduleIcons } from "@/lib/icons";
 import { formatCHF } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useToast } from "@/lib/toast";
 import { clsx } from "@/lib/clsx";
 import type { Contractor, Module } from "@/data/types";
 
 export const ContractorSelection = () => {
+  useDocumentTitle("Step 3 — Contractors");
   const { selectedModules, selectedContractors, selectContractor } = useStore();
+  const toast = useToast();
   const activeModules = MODULES.filter((m) => selectedModules.includes(m.id));
   const [expanded, setExpanded] = useState<string | null>(activeModules[0]?.id ?? null);
 
+  const handleSelect = (modId: Module["id"], contractor: Contractor) => {
+    const wasChosen = selectedContractors[modId]?.name === contractor.name;
+    const mod = MODULES.find((m) => m.id === modId);
+    selectContractor(modId, contractor);
+    if (mod) {
+      toast(
+        wasChosen
+          ? `Cleared ${mod.name} contractor`
+          : `${contractor.name} selected for ${mod.name}`,
+        wasChosen ? "info" : "success",
+      );
+    }
+  };
+
   const pickAllRecommended = () => {
+    let count = 0;
     activeModules.forEach((mod) => {
       const list = CONTRACTORS[mod.id] ?? [];
       const top = list.find((c) => c.badge === "Top Rated") ?? list[0];
-      if (top) selectContractor(mod.id, top);
+      if (top && selectedContractors[mod.id]?.name !== top.name) {
+        selectContractor(mod.id, top);
+        count++;
+      }
     });
+    toast(count > 0 ? `Selected top-rated for ${count} module${count === 1 ? "" : "s"}` : "Top-rated already selected", "success");
   };
 
   if (activeModules.length === 0) {
@@ -59,9 +82,12 @@ export const ContractorSelection = () => {
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
-        <Badge tone="teal">✓ Verified ratings only</Badge>
-        <Badge tone="teal">✓ Price benchmarked</Badge>
-        <Badge tone="teal">✓ On-budget tracked</Badge>
+        {["Verified ratings only", "Price benchmarked", "On-budget tracked"].map((label) => (
+          <Badge key={label} tone="teal" className="gap-1">
+            <Check size={11} strokeWidth={3} />
+            {label}
+          </Badge>
+        ))}
       </div>
 
       <div className="space-y-3">
@@ -77,7 +103,7 @@ export const ContractorSelection = () => {
               chosen={chosen}
               expanded={isExpanded}
               onToggle={() => setExpanded(isExpanded ? null : mod.id)}
-              onSelect={(c) => selectContractor(mod.id, c)}
+              onSelect={(c) => handleSelect(mod.id, c)}
             />
           );
         })}
@@ -122,8 +148,11 @@ const ModuleAccordion = ({ mod, contractors, chosen, expanded, onToggle, onSelec
           <div>
             <div className="text-sm font-semibold text-navy">{mod.name}</div>
             {chosen ? (
-              <div className="text-xs text-teal">
-                ✓ {chosen.name} · {formatCHF(chosen.price)}
+              <div className="flex items-center gap-1 text-xs text-teal">
+                <Check size={12} strokeWidth={3} />
+                <span>
+                  {chosen.name} · {formatCHF(chosen.price)}
+                </span>
               </div>
             ) : (
               <div className="text-xs text-warning">No contractor selected</div>
@@ -193,20 +222,20 @@ const ContractorRow = ({ contractor: ct, rank, module, isChosen, onSelect }: Row
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-bold text-navy">{ct.name}</span>
-          <Badge tone="teal">
-            <ShieldCheck size={10} className="-mt-0.5 mr-0.5 inline" />
+          <Badge tone="teal" className="gap-1">
+            <ShieldCheck size={11} strokeWidth={2.5} />
             Verified
           </Badge>
           {ct.badge && <Badge tone={badgeTone(rank)}>{ct.badge}</Badge>}
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted">
+        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted">
           <span className="inline-flex items-center gap-1">
             <MapPin size={11} />
             {ct.loc}
           </span>
-          <span>·</span>
+          <span aria-hidden="true">·</span>
           <span>{ct.years} years in business</span>
-          <span>·</span>
+          <span aria-hidden="true">·</span>
           <span>{ct.certs.join(", ")}</span>
         </div>
       </div>
@@ -234,8 +263,9 @@ const ContractorRow = ({ contractor: ct, rank, module, isChosen, onSelect }: Row
     </div>
 
     {isChosen && (
-      <div className="mt-3 rounded-lg bg-teal/10 px-3 py-1.5 text-center text-[11px] font-semibold text-teal">
-        ✓ Selected for {module.name}
+      <div className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-teal/10 px-3 py-1.5 text-[11px] font-semibold text-teal">
+        <Check size={12} strokeWidth={3} />
+        Selected for {module.name}
       </div>
     )}
   </Card>

@@ -2,11 +2,13 @@ import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { MobileTopBar } from "./MobileTopBar";
 import { stepIndex } from "@/data/steps";
+import { useKeyboardNav } from "@/lib/useKeyboardNav";
 
 export const Layout = () => {
   const location = useLocation();
   const idx = stepIndex(location.pathname);
   const isLanding = location.pathname === "/";
+  useKeyboardNav(idx);
 
   if (isLanding) {
     return <Outlet />;

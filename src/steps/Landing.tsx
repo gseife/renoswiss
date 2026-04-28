@@ -1,36 +1,57 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, ShieldCheck, Sparkles, Building2 } from "lucide-react";
+import {
+  ArrowRight,
+  Building2,
+  Check,
+  RotateCcw,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
+import { KPI } from "@/components/ui/KPI";
 import { useStore } from "@/lib/store";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { computeTotals } from "@/lib/derived";
+import { clsx } from "@/lib/clsx";
+
+const ANALYZE_STEPS = [
+  "Reading GWR building register",
+  "Querying GEAK energy database",
+  "Matching cantonal subsidy programs",
+  "Comparing renovation benchmarks",
+];
+const STEP_DURATION = 420;
 
 export const Landing = () => {
+  useDocumentTitle();
   const navigate = useNavigate();
-  const { address, setAddress } = useStore();
+  const { address, setAddress, selectedModules, selectedContractors, reset } = useStore();
   const [draft, setDraft] = useState(address);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeStep, setAnalyzeStep] = useState(0);
+
+  const hasResume = selectedModules.length > 0 || Object.keys(selectedContractors).length > 0;
+
+  useEffect(() => {
+    if (!analyzing) return;
+    if (analyzeStep >= ANALYZE_STEPS.length) {
+      const t = window.setTimeout(() => navigate("/building"), 350);
+      return () => window.clearTimeout(t);
+    }
+    const t = window.setTimeout(() => setAnalyzeStep((s) => s + 1), STEP_DURATION);
+    return () => window.clearTimeout(t);
+  }, [analyzing, analyzeStep, navigate]);
 
   const start = () => {
     if (draft.trim()) setAddress(draft.trim());
+    setAnalyzeStep(0);
     setAnalyzing(true);
-    window.setTimeout(() => navigate("/building"), 1400);
   };
 
   if (analyzing) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface px-6">
-        <div className="max-w-md text-center">
-          <Logo size="lg" />
-          <div className="spinner mx-auto mt-8 h-10 w-10" />
-          <h2 className="mt-6 font-serif text-xl text-navy">Analyzing your building…</h2>
-          <p className="mt-2 text-sm text-muted">
-            Cross-referencing GWR building register, GEAK energy database, cantonal subsidy
-            programs and historical renovation data.
-          </p>
-        </div>
-      </div>
-    );
+    return <AnalyzingView step={analyzeStep} />;
   }
 
   return (
@@ -40,8 +61,16 @@ export const Landing = () => {
         <span className="text-xs text-muted">Demo prototype</span>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 pb-24 pt-12 lg:grid lg:grid-cols-12 lg:gap-12 lg:pt-20">
+      <main className="mx-auto max-w-6xl px-6 pb-24 pt-8 lg:grid lg:grid-cols-12 lg:gap-12 lg:pt-16">
         <div className="lg:col-span-7">
+          {hasResume && (
+            <ResumeBanner
+              modulesCount={selectedModules.length}
+              onContinue={() => navigate("/summary")}
+              onReset={() => reset()}
+            />
+          )}
+
           <div className="mb-3 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.25em] text-gold">
             <Sparkles size={12} />
             Renovate Smarter
@@ -115,6 +144,97 @@ export const Landing = () => {
   );
 };
 
+const ResumeBanner = ({
+  modulesCount,
+  onContinue,
+  onReset,
+}: {
+  modulesCount: number;
+  onContinue: () => void;
+  onReset: () => void;
+}) => {
+  const { selectedModules, selectedContractors } = useStore();
+  const totals = computeTotals(selectedModules, selectedContractors);
+  return (
+    <div className="mb-6 flex flex-col gap-3 rounded-xl border border-teal/30 bg-teal/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <div className="text-sm font-semibold text-navy">Welcome back</div>
+        <div className="text-xs text-muted">
+          You had {modulesCount} module{modulesCount === 1 ? "" : "s"} selected (
+          {totals.geakImprovement}). Pick up where you left off?
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button variant="secondary" size="sm" onClick={onReset}>
+          <RotateCcw size={13} />
+          Start over
+        </Button>
+        <Button size="sm" onClick={onContinue}>
+          Continue
+          <ArrowRight size={13} />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+const AnalyzingView = ({ step }: { step: number }) => (
+  <div className="flex min-h-screen items-center justify-center bg-surface px-6">
+    <div className="w-full max-w-md text-center">
+      <Logo size="lg" />
+      <h2 className="mt-8 font-serif text-2xl text-navy">Analyzing your building…</h2>
+      <p className="mt-2 text-sm text-muted">
+        Cross-referencing official Swiss building data sources.
+      </p>
+
+      <ol className="mt-8 space-y-2 text-left">
+        {ANALYZE_STEPS.map((label, i) => {
+          const done = i < step;
+          const current = i === step;
+          return (
+            <li
+              key={label}
+              className={clsx(
+                "flex items-center gap-3 rounded-lg border px-4 py-2.5 transition-all duration-300",
+                done && "border-emerald/30 bg-emerald/5",
+                current && "border-teal/30 bg-teal/5",
+                !done && !current && "border-line bg-white opacity-50",
+              )}
+            >
+              <span
+                className={clsx(
+                  "grid h-6 w-6 shrink-0 place-items-center rounded-full",
+                  done && "bg-emerald text-white",
+                  current && "bg-teal text-white",
+                  !done && !current && "bg-line text-muted",
+                )}
+              >
+                {done ? (
+                  <Check size={12} strokeWidth={3} />
+                ) : current ? (
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                ) : (
+                  <span className="text-[10px] font-bold">{i + 1}</span>
+                )}
+              </span>
+              <span
+                className={clsx(
+                  "text-sm",
+                  done && "text-emerald",
+                  current && "font-semibold text-navy",
+                  !done && !current && "text-muted",
+                )}
+              >
+                {label}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  </div>
+);
+
 const PreviewCard = () => (
   <div className="relative">
     <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-teal/20 via-emerald/10 to-gold/20 blur-2xl" />
@@ -131,17 +251,17 @@ const PreviewCard = () => (
       <div className="mb-1 font-serif text-lg text-navy">Musterstrasse 42, Zürich</div>
       <div className="text-xs text-muted">1972 · Einfamilienhaus · 185 m²</div>
 
-      <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-        <Metric value="F → B" label="GEAK" tone="teal" />
-        <Metric value="−7.0 t" label="CO₂/yr" tone="emerald" />
-        <Metric value="CHF 9,800" label="Saved/yr" tone="gold" />
+      <div className="mt-5 grid grid-cols-3 gap-2">
+        <KPI value="F → B" label="GEAK" tone="teal" />
+        <KPI value="−7.0 t" label="CO₂/yr" tone="emerald" />
+        <KPI value="CHF 9,800" label="Saved/yr" tone="gold" />
       </div>
 
       <div className="mt-5 space-y-2">
         {[
-          { name: "Facade insulation", price: "CHF 47,200", tone: "Critical" },
-          { name: "Heat pump", price: "CHF 36,500", tone: "Critical" },
-          { name: "Solar PV system", price: "CHF 25,200", tone: "Recommended" },
+          { name: "Facade insulation", price: "CHF 47,200" },
+          { name: "Heat pump", price: "CHF 36,500" },
+          { name: "Solar PV system", price: "CHF 25,200" },
         ].map((m) => (
           <div
             key={m.name}
@@ -161,26 +281,5 @@ const PreviewCard = () => (
         <span className="font-serif text-base font-bold text-gold-soft">CHF 37,600</span>
       </div>
     </div>
-  </div>
-);
-
-const toneClass = {
-  teal: "bg-teal/10 text-teal",
-  emerald: "bg-emerald/10 text-emerald",
-  gold: "bg-gold/10 text-gold",
-} as const;
-
-const Metric = ({
-  value,
-  label,
-  tone,
-}: {
-  value: string;
-  label: string;
-  tone: keyof typeof toneClass;
-}) => (
-  <div className={`rounded-lg px-2 py-2.5 ${toneClass[tone]}`}>
-    <div className="font-serif text-base font-bold leading-tight">{value}</div>
-    <div className="text-[10px] opacity-80">{label}</div>
   </div>
 );

@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { Check, RotateCcw } from "lucide-react";
 import { Logo } from "./Logo";
+import { SidebarDashboard } from "./SidebarDashboard";
 import { STEPS } from "@/data/steps";
 import { useStore } from "@/lib/store";
 import { clsx } from "@/lib/clsx";
@@ -18,7 +19,11 @@ export const Sidebar = ({ currentIndex }: SidebarProps) => {
         <p className="mt-2 text-xs text-muted">Home renovation, simplified.</p>
       </div>
 
-      <nav className="flex-1">
+      <div className="mb-5">
+        <SidebarDashboard />
+      </div>
+
+      <nav className="flex-1 overflow-y-auto">
         <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
           Your renovation plan
         </div>
