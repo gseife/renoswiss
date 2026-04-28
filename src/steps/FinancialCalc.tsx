@@ -104,6 +104,42 @@ export const FinancialCalc = () => {
       </Card>
 
       <Card className="mt-3 p-5">
+        <h3 className="mb-1 font-serif text-base font-bold text-navy">Annual breakdown</h3>
+        <p className="mb-4 text-xs text-muted">
+          Year-1 view of what the renovation costs and saves you per year.
+        </p>
+        <dl className="space-y-2 text-sm">
+          <Line label="Amortisation (principal repayment)" value={formatCHF(result.annualAmortisation)} />
+          <Line label="Cost of capital (interest)" value={formatCHF(result.annualInterest)} />
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="text-sm font-bold text-navy">Annual cost</span>
+            <span className="font-serif text-base font-bold text-navy">
+              {formatCHF(result.annualPayment)}
+            </span>
+          </div>
+          <div className="my-2 border-t border-line" />
+          <Line label="Energy savings" value={`− ${formatCHF(annualEnergySaving)}`} positive />
+          <Line label="Tax deduction benefit" value={`− ${formatCHF(result.annualTaxBenefit)}`} positive />
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="text-sm font-bold text-navy">Annual savings</span>
+            <span className="font-serif text-base font-bold text-emerald">
+              {formatCHF(annualEnergySaving + result.annualTaxBenefit)}
+            </span>
+          </div>
+        </dl>
+        <div className="mt-3 flex items-baseline justify-between border-t border-line pt-3">
+          <span className="text-sm font-bold text-navy">
+            {result.netAnnualCost > 0 ? "Net cost per year" : "Net profit per year"}
+          </span>
+          <span
+            className={`font-serif text-xl font-bold ${result.netAnnualCost > 0 ? "text-teal" : "text-emerald"}`}
+          >
+            {formatCHF(Math.abs(result.netAnnualCost))}
+          </span>
+        </div>
+      </Card>
+
+      <Card className="mt-3 p-5">
         <h3 className="mb-4 font-serif text-base font-bold text-navy">Long-term value</h3>
         <div className="grid grid-cols-3 gap-2">
           <KPI label="Property uplift" value={formatCHF(result.propertyIncrease)} tone="emerald" />

@@ -110,7 +110,7 @@ export const ModuleSelection = () => {
           </p>
         </Card>
       ) : (
-        <Card className="mt-5 border-0 bg-navy p-5 text-white">
+        <Card className="mt-5 overflow-hidden border-0 bg-gradient-to-br from-navy to-teal p-5 text-white">
           <div className="grid grid-cols-3 gap-2">
             <Stat value={formatCHF(totalCost)} label="Estimated total" tone="white" />
             <Stat value={formatCHF(totalSaving)} label="Annual savings" tone="mint" />

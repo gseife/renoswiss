@@ -20,6 +20,11 @@ export interface FinanceResult {
   netMonthlyCost: number;
   paybackYears: number;
   propertyIncrease: number;
+  annualPayment: number;
+  annualInterest: number;
+  annualAmortisation: number;
+  annualTaxBenefit: number;
+  netAnnualCost: number;
 }
 
 /**
@@ -62,6 +67,10 @@ export const calcFinance = ({
   // Conservative property-value uplift estimate (~18% of renovation spend).
   const propertyIncrease = Math.round(totalCost * 0.18);
 
+  const annualPayment = monthlyPayment * 12;
+  const annualAmortisation = Math.max(0, annualPayment - annualInterest);
+  const netAnnualCost = annualPayment - annualEnergySaving - annualTaxBenefit;
+
   return {
     monthlyPayment,
     totalInterest,
@@ -70,5 +79,10 @@ export const calcFinance = ({
     netMonthlyCost,
     paybackYears,
     propertyIncrease,
+    annualPayment,
+    annualInterest,
+    annualAmortisation,
+    annualTaxBenefit,
+    netAnnualCost,
   };
 };
