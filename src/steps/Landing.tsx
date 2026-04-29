@@ -866,7 +866,10 @@ const RenovationSequence = ({ onStart }: { onStart: () => void }) => {
       const total = el.offsetHeight - window.innerHeight;
       const passed = Math.min(Math.max(-rect.top, 0), total);
       const t = total > 0 ? passed / total : 0;
-      setProgress(t * (RENO_STAGES.length - 1));
+      const next = t * (RENO_STAGES.length - 1);
+      // Only advance forward — scrolling up freezes the house at its highest
+      // reached state instead of reverse-splitting.
+      setProgress((prev) => (next > prev ? next : prev));
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
