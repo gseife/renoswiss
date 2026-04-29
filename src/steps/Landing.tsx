@@ -204,10 +204,165 @@ const Hero = () => {
 };
 
 /* -------------------------------------------------------------------------- */
-/*  House SVG (modern Swiss EFH, ~30° gable, white render, grey shutters)     */
-/*  Layered as separate <g> with ids so the scroll sequence can transform     */
-/*  individual pieces in viewBox units.                                       */
+/*  House SVG (modern Swiss EFH, ~30° gable, white render)                    */
+/*  Front-3/4 view. Front face dominant with 2×2 windows + central door.      */
+/*  Side face with 2 vertically-aligned windows. Layered <g> with ids so      */
+/*  the scroll sequence can transform individual pieces in viewBox units.     */
 /* -------------------------------------------------------------------------- */
+
+type Pt = readonly [number, number];
+
+// Front face: FLT(160,270) → FRT(440,295) → FRB(440,495) → FLB(160,470)
+const F = (u: number, v: number): Pt =>
+  [160 + 280 * u, 270 + 25 * u + 200 * v] as const;
+// Side face: FRT(440,295) → BRT(560,273) → BRB(560,473) → FRB(440,495)
+const S = (u: number, v: number): Pt =>
+  [440 + 120 * u, 295 - 22 * u + 200 * v] as const;
+// East roof slope: FrontPeak(300,200) ↔ BackPeak(420,178) ↔ BRT(560,273) ↔ FRT(440,295)
+const R = (u: number, v: number): Pt => [
+  300 + 120 * u + 140 * v,
+  200 - 22 * u + 95 * v,
+];
+
+const FLT: Pt = [160, 270];
+const FRT: Pt = [440, 295];
+const FRB: Pt = [440, 495];
+const FLB: Pt = [160, 470];
+const BRT: Pt = [560, 273];
+const BRB: Pt = [560, 473];
+const FrontPeak: Pt = [300, 200];
+const BackPeak: Pt = [420, 178];
+
+const pts = (...points: Pt[]) =>
+  points.map((p) => `${p[0]},${p[1]}`).join(" ");
+
+const FrontWindow = ({
+  uc,
+  vc,
+  k,
+}: {
+  uc: number;
+  vc: number;
+  k: string;
+}) => {
+  const hu = 0.085;
+  const hv = 0.10;
+  const tl = F(uc - hu, vc - hv);
+  const tr = F(uc + hu, vc - hv);
+  const br = F(uc + hu, vc + hv);
+  const bl = F(uc - hu, vc + hv);
+  const ins = 0.012;
+  const gtl = F(uc - hu + ins, vc - hv + ins * 1.4);
+  const gtr = F(uc + hu - ins, vc - hv + ins * 1.4);
+  const gbr = F(uc + hu - ins, vc + hv - ins * 1.4);
+  const gbl = F(uc - hu + ins, vc + hv - ins * 1.4);
+  const mt = F(uc, vc - hv);
+  const mb = F(uc, vc + hv);
+  const ml = F(uc - hu, vc);
+  const mr = F(uc + hu, vc);
+  const sillExt = 0.014;
+  const sillH = 0.018;
+  const sl = F(uc - hu - sillExt, vc + hv);
+  const sr = F(uc + hu + sillExt, vc + hv);
+  const sl2 = F(uc - hu - sillExt, vc + hv + sillH);
+  const sr2 = F(uc + hu + sillExt, vc + hv + sillH);
+  return (
+    <g key={k}>
+      <polygon
+        points={pts(tl, tr, br, bl)}
+        fill="#ffffff"
+        stroke="#9a9da0"
+        strokeWidth="0.7"
+      />
+      <polygon
+        points={pts(gtl, gtr, gbr, gbl)}
+        fill="url(#glass)"
+        opacity="0.85"
+      />
+      <line
+        x1={mt[0]}
+        y1={mt[1]}
+        x2={mb[0]}
+        y2={mb[1]}
+        stroke="#ffffff"
+        strokeWidth="1.2"
+      />
+      <line
+        x1={ml[0]}
+        y1={ml[1]}
+        x2={mr[0]}
+        y2={mr[1]}
+        stroke="#ffffff"
+        strokeWidth="0.9"
+      />
+      <polygon points={pts(sl, sr, sr2, sl2)} fill="#bfc4c8" />
+    </g>
+  );
+};
+
+const SideWindow = ({
+  uc,
+  vc,
+  k,
+}: {
+  uc: number;
+  vc: number;
+  k: string;
+}) => {
+  const hu = 0.16;
+  const hv = 0.10;
+  const tl = S(uc - hu, vc - hv);
+  const tr = S(uc + hu, vc - hv);
+  const br = S(uc + hu, vc + hv);
+  const bl = S(uc - hu, vc + hv);
+  const ins = 0.022;
+  const gtl = S(uc - hu + ins, vc - hv + ins * 1.0);
+  const gtr = S(uc + hu - ins, vc - hv + ins * 1.0);
+  const gbr = S(uc + hu - ins, vc + hv - ins * 1.0);
+  const gbl = S(uc - hu + ins, vc + hv - ins * 1.0);
+  const mt = S(uc, vc - hv);
+  const mb = S(uc, vc + hv);
+  const ml = S(uc - hu, vc);
+  const mr = S(uc + hu, vc);
+  const sillExt = 0.025;
+  const sillH = 0.018;
+  const sl = S(uc - hu - sillExt, vc + hv);
+  const sr = S(uc + hu + sillExt, vc + hv);
+  const sl2 = S(uc - hu - sillExt, vc + hv + sillH);
+  const sr2 = S(uc + hu + sillExt, vc + hv + sillH);
+  return (
+    <g key={k}>
+      <polygon
+        points={pts(tl, tr, br, bl)}
+        fill="#ffffff"
+        stroke="#9a9da0"
+        strokeWidth="0.7"
+      />
+      <polygon
+        points={pts(gtl, gtr, gbr, gbl)}
+        fill="url(#glass)"
+        opacity="0.85"
+      />
+      <line
+        x1={mt[0]}
+        y1={mt[1]}
+        x2={mb[0]}
+        y2={mb[1]}
+        stroke="#ffffff"
+        strokeWidth="1.2"
+      />
+      <line
+        x1={ml[0]}
+        y1={ml[1]}
+        x2={mr[0]}
+        y2={mr[1]}
+        stroke="#ffffff"
+        strokeWidth="0.9"
+      />
+      <polygon points={pts(sl, sr, sr2, sl2)} fill="#bfc4c8" />
+    </g>
+  );
+};
 
 interface HouseSVGProps {
   roofY?: number;
@@ -325,219 +480,169 @@ const HouseSVG = ({
       </g>
     )}
 
-    <rect x="-40" y="500" width="880" height="20" fill="url(#ground)" />
-    <ellipse cx="400" cy="500" rx="320" ry="8" fill="#000" opacity="0.10" />
+    {/* Underground earth (revealed when heat pump descends) */}
+    {heatpumpUnderground && (
+      <g clipPath="url(#undergroundClip)">
+        <rect x="-40" y="500" width="880" height="220" fill="url(#undergroundEarth)" />
+        <rect x="-40" y="500" width="880" height="220" fill="url(#earthPat)" />
+        <rect x="-40" y="540" width="880" height="2" fill="#000" opacity="0.12" />
+        <rect x="-40" y="600" width="880" height="2" fill="#000" opacity="0.10" />
+      </g>
+    )}
 
+    {/* Ground & contact shadow */}
+    <rect x="-40" y="500" width="880" height="20" fill="url(#ground)" />
+    <ellipse cx="360" cy="500" rx="260" ry="6" fill="#000" opacity="0.10" />
+
+    {/* Plinth — concrete strip at the base of the walls */}
     <g id="plinth">
       <polygon
-        points="180,490 400,520 620,490 620,470 400,500 180,470"
+        points={pts(
+          [160, 488],
+          [440, 513],
+          [560, 491],
+          [560, 477],
+          [440, 499],
+          [160, 474],
+        )}
         fill="url(#plinth)"
       />
       <polygon
-        points="180,490 400,520 620,490 620,470 400,500 180,470"
+        points={pts(
+          [160, 488],
+          [440, 513],
+          [560, 491],
+          [560, 477],
+          [440, 499],
+          [160, 474],
+        )}
         fill="url(#seamPat)"
       />
     </g>
 
+    {/* Facade — front + side walls and the south gable */}
     <g id="facade" transform={`translate(${facadeX} 0)`} opacity={facadeOpacity}>
-      <polygon points="180,470 400,500 400,300 180,260" fill="url(#renderFront)" />
-      <polygon points="180,470 400,500 400,300 180,260" fill="url(#renderPat)" />
-      <polygon points="400,500 620,470 620,260 400,300" fill="url(#renderSide)" />
-      <polygon points="400,500 620,470 620,260 400,300" fill="url(#renderPat)" />
-      <polygon points="180,260 400,300 290,235" fill="url(#renderGable)" />
-      <polygon points="180,260 400,300 290,235" fill="url(#renderPat)" />
+      <polygon points={pts(FLT, FRT, FRB, FLB)} fill="url(#renderFront)" />
+      <polygon points={pts(FLT, FRT, FRB, FLB)} fill="url(#renderPat)" />
+      <polygon points={pts(FRT, BRT, BRB, FRB)} fill="url(#renderSide)" />
+      <polygon points={pts(FRT, BRT, BRB, FRB)} fill="url(#renderPat)" />
+      <polygon points={pts(FLT, FRT, FrontPeak)} fill="url(#renderGable)" />
+      <polygon points={pts(FLT, FRT, FrontPeak)} fill="url(#renderPat)" />
+      {/* eave shadow lines under the roof */}
       <polygon
-        points="400,300 620,260 510,225"
-        fill="url(#renderSide)"
-        opacity="0.95"
+        points={pts(FLT, FRT, [FRT[0], FRT[1] + 4], [FLT[0], FLT[1] + 4])}
+        fill="#000"
+        opacity="0.10"
       />
-      <polygon points="400,300 620,260 510,225" fill="url(#renderPat)" />
-      <polygon points="180,260 400,300 400,304 180,264" fill="#000" opacity="0.10" />
-      <polygon points="400,300 620,260 620,264 400,304" fill="#000" opacity="0.08" />
+      <polygon
+        points={pts(FRT, BRT, [BRT[0], BRT[1] + 4], [FRT[0], FRT[1] + 4])}
+        fill="#000"
+        opacity="0.08"
+      />
+      {/* corner edge between front and side */}
+      <line
+        x1={FRT[0]}
+        y1={FRT[1]}
+        x2={FRB[0]}
+        y2={FRB[1]}
+        stroke="#000"
+        strokeWidth="0.6"
+        opacity="0.10"
+      />
     </g>
 
+    {/* Windows + door — translated/scaled with facade so they stay attached */}
     <g
       id="windows"
-      transform={`translate(${facadeX} ${windowsY}) scale(${windowsScale}) translate(${(1 - windowsScale) * 400} ${(1 - windowsScale) * 380})`}
+      transform={`translate(${facadeX} ${windowsY}) scale(${windowsScale}) translate(${(1 - windowsScale) * 360} ${(1 - windowsScale) * 380})`}
     >
-      {[0, 1].flatMap((row) =>
-        [0, 1].map((col) => {
-          const x = 220 + col * 90;
-          const y = 320 + row * 70 + col * 22;
-          const off = row ? 5 : 0;
-          return (
-            <g key={`fw-${row}-${col}`}>
-              <polygon
-                points={`${x - 22},${y + off} ${x - 4},${y + 4 + off} ${x - 4},${y + 50 + off} ${x - 22},${y + 46 + off}`}
-                fill="#7d8489"
-              />
-              <line
-                x1={x - 19}
-                y1={y + 8 + off}
-                x2={x - 19}
-                y2={y + 44 + off}
-                stroke="#5e6469"
-                strokeWidth="0.5"
-              />
-              <line
-                x1={x - 13}
-                y1={y + 10 + off}
-                x2={x - 13}
-                y2={y + 46 + off}
-                stroke="#5e6469"
-                strokeWidth="0.5"
-              />
-              <polygon
-                points={`${x + 44},${y + 10 + off} ${x + 62},${y + 14 + off} ${x + 62},${y + 60 + off} ${x + 44},${y + 56 + off}`}
-                fill="#7d8489"
-              />
-              <line
-                x1={x + 47}
-                y1={y + 18 + off}
-                x2={x + 47}
-                y2={y + 54 + off}
-                stroke="#5e6469"
-                strokeWidth="0.5"
-              />
-              <line
-                x1={x + 53}
-                y1={y + 20 + off}
-                x2={x + 53}
-                y2={y + 56 + off}
-                stroke="#5e6469"
-                strokeWidth="0.5"
-              />
-              <polygon
-                points={`${x - 4},${y + 4 + off} ${x + 44},${y + 14 + off} ${x + 44},${y + 56 + off} ${x - 4},${y + 46 + off}`}
-                fill="#ffffff"
-                stroke="#9a9da0"
-                strokeWidth="0.8"
-              />
-              <polygon
-                points={`${x},${y + 8 + off} ${x + 40},${y + 18 + off} ${x + 40},${y + 50 + off} ${x},${y + 42 + off}`}
-                fill="url(#glass)"
-                opacity="0.85"
-              />
-              <line
-                x1={x + 20}
-                y1={y + 13 + off}
-                x2={x + 20}
-                y2={y + 46 + off}
-                stroke="#ffffff"
-                strokeWidth="1.1"
-              />
-              <line
-                x1={x + 1}
-                y1={y + 25 + off}
-                x2={x + 39}
-                y2={y + 34 + off}
-                stroke="#ffffff"
-                strokeWidth="0.9"
-              />
-              <polygon
-                points={`${x - 6},${y + 46 + off} ${x + 46},${y + 56 + off} ${x + 46},${y + 60 + off} ${x - 6},${y + 50 + off}`}
-                fill="#bfc4c8"
-              />
-            </g>
-          );
-        }),
-      )}
+      {/* Front face: 2×2 grid of identical windows around a central door */}
+      <FrontWindow uc={0.20} vc={0.27} k="fw-tl" />
+      <FrontWindow uc={0.80} vc={0.27} k="fw-tr" />
+      <FrontWindow uc={0.20} vc={0.65} k="fw-bl" />
+      <FrontWindow uc={0.80} vc={0.65} k="fw-br" />
 
-      {[0, 1, 2].map((col) => {
-        const x = 440 + col * 56;
-        const y = 330 + col * -14;
-        return (
-          <g key={`sw-${col}`}>
-            <polygon
-              points={`${x - 2},${y} ${x + 38},${y - 10} ${x + 38},${y + 44} ${x - 2},${y + 54}`}
-              fill="#ffffff"
-              stroke="#9a9da0"
-              strokeWidth="0.8"
-            />
-            <polygon
-              points={`${x + 1},${y + 3} ${x + 35},${y - 7} ${x + 35},${y + 41} ${x + 1},${y + 51}`}
-              fill="url(#glass)"
-              opacity="0.85"
-            />
-            <line
-              x1={x + 18}
-              y1={y - 2}
-              x2={x + 18}
-              y2={y + 47}
-              stroke="#ffffff"
-              strokeWidth="1"
-            />
-            <polygon
-              points={`${x - 4},${y + 50} ${x + 40},${y + 40} ${x + 40},${y + 44} ${x - 4},${y + 54}`}
-              fill="#bfc4c8"
-            />
-          </g>
-        );
-      })}
+      {/* Side face: two windows aligned vertically with the front floors */}
+      <SideWindow uc={0.50} vc={0.27} k="sw-t" />
+      <SideWindow uc={0.50} vc={0.65} k="sw-b" />
 
-      <g>
-        <polygon points="396,495 444,485 444,420 396,430" fill="#3a3633" />
-        <polygon points="400,490 440,482 440,424 400,433" fill="#52504c" />
-        <line x1="420" y1="430" x2="420" y2="486" stroke="#2c2a28" strokeWidth="0.5" />
-        <circle cx="437" cy="455" r="1.4" fill="#9a9da0" />
-        <polygon points="394,430 446,420 446,424 394,434" fill="#000" opacity="0.25" />
-      </g>
+      {/* Door — centered on the front face, ground-level */}
+      <FrontDoor />
     </g>
 
+    {/* Roof — east slope (south-facing) + ridge + chimney */}
     <g id="roof" transform={`translate(0 ${roofY})`} opacity={roofOpacity}>
-      <polygon points="170,260 400,300 290,225" fill="url(#tileFront)" />
-      <polygon points="170,260 400,300 290,225" fill="url(#tilePat)" />
-      <polygon points="400,300 630,260 510,215" fill="url(#tileSide)" />
-      <polygon points="400,300 630,260 510,215" fill="url(#tilePat)" />
-      <line x1="290" y1="225" x2="510" y2="215" stroke="#0a1418" strokeWidth="2" />
-      <polygon points="170,260 400,300 400,304 170,264" fill="#1a2226" />
-      <polygon points="400,300 630,260 630,264 400,304" fill="#0d1316" />
+      <polygon
+        points={pts(FrontPeak, BackPeak, BRT, FRT)}
+        fill="url(#tileFront)"
+      />
+      <polygon
+        points={pts(FrontPeak, BackPeak, BRT, FRT)}
+        fill="url(#tilePat)"
+      />
+      {/* eave shadow under roof */}
+      <polygon
+        points={pts(FRT, BRT, [BRT[0], BRT[1] + 4], [FRT[0], FRT[1] + 4])}
+        fill="#000"
+        opacity="0.18"
+      />
+      {/* ridge line */}
+      <line
+        x1={FrontPeak[0]}
+        y1={FrontPeak[1]}
+        x2={BackPeak[0]}
+        y2={BackPeak[1]}
+        stroke="#0a1418"
+        strokeWidth="2"
+      />
+      {/* gable trim — thin strip along the south gable's edges */}
+      <polygon
+        points={pts(FLT, FrontPeak, [FrontPeak[0] - 3, FrontPeak[1] + 4], [FLT[0] - 3, FLT[1] + 4])}
+        fill="#1f2a30"
+      />
+      <polygon
+        points={pts(FRT, FrontPeak, [FrontPeak[0] + 3, FrontPeak[1] + 4], [FRT[0] + 3, FRT[1] + 4])}
+        fill="#1f2a30"
+      />
+      {/* chimney */}
       <g>
-        <polygon points="430,232 458,228 458,200 430,204" fill="#3d4a52" />
-        <polygon points="430,232 458,228 458,224 430,228" fill="#1f2a30" />
-        <polygon points="427,202 461,198 463,202 429,206" fill="#bfc4c8" />
+        <polygon points={pts([352, 192], [378, 188], [378, 162], [352, 166])} fill="#3d4a52" />
+        <polygon points={pts([352, 192], [378, 188], [378, 184], [352, 188])} fill="#1f2a30" />
+        <polygon points={pts([350, 166], [380, 162], [382, 165], [352, 169])} fill="#bfc4c8" />
       </g>
     </g>
 
+    {/* Solar PV — laid in a 3×4 grid on the east (south-facing) roof slope */}
     {(solarVisible || solarOpacity > 0) && (
       <g id="solar" transform={`translate(0 ${solarY})`} opacity={solarOpacity}>
         {[0, 1, 2].flatMap((row) =>
           [0, 1, 2, 3].map((col) => {
-            const baseX = 430 + col * 38 - row * 4;
-            const baseY = 250 + row * 16 - col * 8;
+            const u = 0.10 + col * 0.20;
+            const v = 0.18 + row * 0.26;
+            const w = 0.17;
+            const h = 0.22;
+            const tl = R(u, v);
+            const tr = R(u + w, v);
+            const br = R(u + w, v + h);
+            const bl = R(u, v + h);
             return (
               <g key={`pv-${row}-${col}`}>
-                <polygon
-                  points={`${baseX},${baseY} ${baseX + 34},${baseY - 9} ${baseX + 34},${baseY + 13} ${baseX},${baseY + 22}`}
-                  fill="url(#pvCell)"
-                />
-                <polygon
-                  points={`${baseX},${baseY} ${baseX + 34},${baseY - 9} ${baseX + 34},${baseY + 13} ${baseX},${baseY + 22}`}
-                  fill="url(#pvHi)"
-                />
+                <polygon points={pts(tl, tr, br, bl)} fill="url(#pvCell)" />
+                <polygon points={pts(tl, tr, br, bl)} fill="url(#pvHi)" />
                 <line
-                  x1={baseX + 11}
-                  y1={baseY + 1}
-                  x2={baseX + 11}
-                  y2={baseY + 20}
+                  x1={(tl[0] + tr[0]) / 2}
+                  y1={(tl[1] + tr[1]) / 2}
+                  x2={(bl[0] + br[0]) / 2}
+                  y2={(bl[1] + br[1]) / 2}
                   stroke="#0a1f2e"
                   strokeWidth="0.4"
                   opacity="0.6"
                 />
                 <line
-                  x1={baseX + 22}
-                  y1={baseY - 2}
-                  x2={baseX + 22}
-                  y2={baseY + 17}
-                  stroke="#0a1f2e"
-                  strokeWidth="0.4"
-                  opacity="0.6"
-                />
-                <line
-                  x1={baseX + 1}
-                  y1={baseY + 11}
-                  x2={baseX + 33}
-                  y2={baseY + 2}
+                  x1={(tl[0] + bl[0]) / 2}
+                  y1={(tl[1] + bl[1]) / 2}
+                  x2={(tr[0] + br[0]) / 2}
+                  y2={(tr[1] + br[1]) / 2}
                   stroke="#0a1f2e"
                   strokeWidth="0.4"
                   opacity="0.6"
@@ -549,55 +654,103 @@ const HouseSVG = ({
       </g>
     )}
 
+    {/* Heat pump — sits on the ground to the right of the house */}
     <g id="heatpump" transform={`translate(0 ${heatpumpY})`} opacity={heatpumpOpacity}>
       {heatpumpUnderground && (
         <g opacity={Math.min(1, heatpumpY / 80)}>
           <line
-            x1="660"
-            y1="490"
-            x2="660"
-            y2={490 + heatpumpY}
+            x1="600"
+            y1="495"
+            x2="600"
+            y2={495 + heatpumpY}
             stroke="#0E6655"
             strokeWidth="2"
             opacity="0.7"
           />
           <line
-            x1="675"
-            y1="490"
-            x2="675"
-            y2={490 + heatpumpY}
+            x1="615"
+            y1="495"
+            x2="615"
+            y2={495 + heatpumpY}
             stroke="#B8860B"
             strokeWidth="2"
             opacity="0.7"
           />
         </g>
       )}
-      <polygon
-        points="640,490 680,480 680,448 640,458"
-        fill="#000"
-        opacity="0.18"
-        filter="url(#softShadow)"
-      />
-      <polygon points="635,485 675,475 675,445 635,455" fill="#dcdcd6" />
-      <polygon points="635,485 675,475 675,478 635,488" fill="#9a9a92" />
-      <circle cx="655" cy="466" r="11" fill="#2a2a25" />
-      <circle cx="655" cy="466" r="9" fill="none" stroke="#5a5a52" strokeWidth="1" />
+      {/* shadow */}
+      <ellipse cx="610" cy="498" rx="40" ry="4" fill="#000" opacity="0.20" />
+      {/* outdoor unit body — flat 2D rect with iso depth */}
+      <polygon points="585,496 635,496 635,460 585,460" fill="#dcdcd6" />
+      <polygon points="635,460 635,496 645,491 645,455" fill="#bfbfb6" />
+      <polygon points="585,460 635,460 645,455 595,455" fill="#eeeee6" />
+      <polygon points="585,496 635,496 635,494 585,494" fill="#9a9a92" />
+      {/* fan grille */}
+      <circle cx="610" cy="478" r="11" fill="#2a2a25" />
+      <circle cx="610" cy="478" r="9" fill="none" stroke="#5a5a52" strokeWidth="1" />
       {[0, 1, 2, 3, 4, 5].map((i) => (
         <line
           key={i}
-          x1="655"
-          y1="466"
-          x2={655 + Math.cos((i * Math.PI) / 3) * 8}
-          y2={466 + Math.sin((i * Math.PI) / 3) * 8}
+          x1="610"
+          y1="478"
+          x2={610 + Math.cos((i * Math.PI) / 3) * 8}
+          y2={478 + Math.sin((i * Math.PI) / 3) * 8}
           stroke="#5a5a52"
           strokeWidth="1"
         />
       ))}
-      <circle cx="655" cy="466" r="2" fill="#5a5a52" />
-      <rect x="638" y="450" width="14" height="2" fill="#0E6655" opacity="0.7" />
+      <circle cx="610" cy="478" r="2" fill="#5a5a52" />
+      {/* brand strip */}
+      <rect x="592" y="464" width="14" height="2" fill="#0E6655" opacity="0.7" />
     </g>
   </svg>
 );
+
+const FrontDoor = () => {
+  const uc = 0.50;
+  const vc = 0.78;
+  const hu = 0.07;
+  const hv = 0.21;
+  const tl = F(uc - hu, vc - hv);
+  const tr = F(uc + hu, vc - hv);
+  const br = F(uc + hu, vc + hv);
+  const bl = F(uc - hu, vc + hv);
+  // panel inset
+  const ins = 0.010;
+  const ptl = F(uc - hu + ins, vc - hv + ins * 1.2);
+  const ptr = F(uc + hu - ins, vc - hv + ins * 1.2);
+  const pbr = F(uc + hu - ins, vc + hv);
+  const pbl = F(uc - hu + ins, vc + hv);
+  // glass band — upper third of the door
+  const gtl = F(uc - hu + 0.018, vc - hv + 0.030);
+  const gtr = F(uc + hu - 0.018, vc - hv + 0.030);
+  const gbr = F(uc + hu - 0.018, vc - hv + 0.115);
+  const gbl = F(uc - hu + 0.018, vc - hv + 0.115);
+  // step
+  const sl = F(uc - hu - 0.020, vc + hv);
+  const sr = F(uc + hu + 0.020, vc + hv);
+  const sl2 = F(uc - hu - 0.020, vc + hv + 0.020);
+  const sr2 = F(uc + hu + 0.020, vc + hv + 0.020);
+  // handle — small circle on the right side
+  const handle = F(uc + hu - 0.018, vc + 0.05);
+  return (
+    <g>
+      <polygon points={pts(tl, tr, br, bl)} fill="#3a3633" />
+      <polygon points={pts(ptl, ptr, pbr, pbl)} fill="#52504c" />
+      <polygon points={pts(gtl, gtr, gbr, gbl)} fill="url(#glass)" opacity="0.7" />
+      <line
+        x1={F(uc - hu + 0.018, vc - hv + 0.115)[0]}
+        y1={F(uc - hu + 0.018, vc - hv + 0.115)[1]}
+        x2={F(uc + hu - 0.018, vc - hv + 0.115)[0]}
+        y2={F(uc + hu - 0.018, vc - hv + 0.115)[1]}
+        stroke="#2c2a28"
+        strokeWidth="0.6"
+      />
+      <circle cx={handle[0]} cy={handle[1]} r="1.6" fill="#bfc4c8" />
+      <polygon points={pts(sl, sr, sr2, sl2)} fill="#bfc4c8" />
+    </g>
+  );
+};
 
 /* -------------------------------------------------------------------------- */
 /*  Renovation scroll sequence — pinned, 7 stages                             */
@@ -766,6 +919,7 @@ const RenovationSequence = ({ onStart }: { onStart: () => void }) => {
   return (
     <section ref={sectionRef} className="relative bg-canvas" style={{ height: totalH }}>
       <div className="sticky top-0 h-screen overflow-hidden">
+        {/* gradient backdrop */}
         <div
           className="absolute inset-0"
           style={{
@@ -774,40 +928,46 @@ const RenovationSequence = ({ onStart }: { onStart: () => void }) => {
           }}
         />
 
-        <div className="relative mx-auto grid h-full max-w-[1400px] items-center gap-6 px-6 lg:grid-cols-12 lg:gap-10">
-          <div className="relative h-[60vh] lg:col-span-7 lg:h-[80vh]">
-            <HouseSVG
-              roofY={roofY}
-              solarY={solarY}
-              solarOpacity={solarOpacity}
-              solarVisible={solarVisible}
-              facadeX={facadeX}
-              windowsY={windowsY}
-              windowsScale={windowsScale}
-              heatpumpY={heatpumpY}
-              heatpumpUnderground={heatpumpUnderground}
-            />
+        {/* house — full bleed across the section */}
+        <div className="absolute inset-0">
+          <HouseSVG
+            roofY={roofY}
+            solarY={solarY}
+            solarOpacity={solarOpacity}
+            solarVisible={solarVisible}
+            facadeX={facadeX}
+            windowsY={windowsY}
+            windowsScale={windowsScale}
+            heatpumpY={heatpumpY}
+            heatpumpUnderground={heatpumpUnderground}
+          />
+        </div>
 
-            <div className="pointer-events-none absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-1.5">
-              {RENO_STAGES.map((s, i) => (
-                <span
-                  key={s.id}
-                  className={clsx(
-                    "h-1.5 rounded-full transition-all",
-                    i === activeIdx ? "w-6 bg-navy" : "w-1.5 bg-navy/25",
-                  )}
-                />
-              ))}
-            </div>
-          </div>
+        {/* soft right-side wash so the overlay card stays legible */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[44%] bg-gradient-to-l from-white/65 via-white/30 to-transparent lg:block" />
 
-          <div className="relative lg:col-span-5">
+        {/* stage card — overlay, anchored bottom on mobile, right on lg+ */}
+        <div className="pointer-events-none absolute inset-0 flex items-end px-6 pb-24 sm:items-center sm:pb-0">
+          <div className="pointer-events-auto w-full sm:ml-auto sm:mr-8 sm:max-w-[440px] lg:mr-14 xl:mr-24">
             <StageCard stage={stage} onStart={onStart} />
           </div>
         </div>
 
+        {/* stage indicator dots */}
+        <div className="pointer-events-none absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-1.5">
+          {RENO_STAGES.map((s, i) => (
+            <span
+              key={s.id}
+              className={clsx(
+                "h-1.5 rounded-full transition-all",
+                i === activeIdx ? "w-6 bg-navy" : "w-1.5 bg-navy/25",
+              )}
+            />
+          ))}
+        </div>
+
         {activeIdx === 0 && (
-          <div className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5 text-[10px] uppercase tracking-[0.25em] text-muted">
+          <div className="pointer-events-none absolute bottom-14 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1.5 text-[10px] uppercase tracking-[0.25em] text-muted">
             <span>Scroll</span>
             <svg width="10" height="14" viewBox="0 0 10 14" fill="none">
               <path
