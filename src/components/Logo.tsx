@@ -1,3 +1,5 @@
+import type { MouseEvent } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { clsx } from "@/lib/clsx";
 
 interface LogoProps {
@@ -13,11 +15,34 @@ const sizes = {
 
 export const Logo = ({ size = "md", inverted = false }: LogoProps) => {
   const s = sizes[size];
+  const location = useLocation();
+
+  const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
+    // Let modifier-clicks fall through (cmd/ctrl-click → new tab, shift → new
+    // window, middle-click etc.) so the logo behaves like any normal link.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
+
+    if (location.pathname === "/") {
+      // Already on the home page — don't reload, just scroll to top.
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      // Navigating cross-route. SPA navigation preserves scrollY by default,
+      // so explicitly land the user at the top of the home page.
+      requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+    }
+  };
+
   return (
-    <div className="inline-flex items-center gap-2.5" aria-label="RenoSwiss home">
+    <Link
+      to="/"
+      onClick={handleClick}
+      aria-label="RenoSwiss — back to home"
+      className="group inline-flex items-center gap-2.5 rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-teal/60"
+    >
       <div
         className={clsx(
-          "relative flex items-center justify-center rounded-[10px]",
+          "relative flex items-center justify-center rounded-[10px] transition-transform duration-200 group-hover:scale-[1.04] group-active:scale-[0.97]",
           s.mark,
           inverted ? "bg-white" : "bg-teal",
         )}
@@ -59,6 +84,6 @@ export const Logo = ({ size = "md", inverted = false }: LogoProps) => {
         <span className={inverted ? "text-white" : "text-navy"}>Reno</span>
         <span className={inverted ? "text-mint" : "text-teal"}>Swiss</span>
       </span>
-    </div>
+    </Link>
   );
 };
