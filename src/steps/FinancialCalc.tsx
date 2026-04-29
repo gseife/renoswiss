@@ -40,34 +40,6 @@ export const FinancialCalc = () => {
   );
   const renovationFundingNeed = Math.max(0, totalCost - totalSubsidies);
 
-  if (selectedModules.length === 0) {
-    return (
-      <>
-        <SectionHeading
-          eyebrow="Step 5"
-          title="Financial calculator"
-          description="Pick at least one renovation module first — there's nothing to finance yet."
-        />
-        <Card className="flex flex-col items-center gap-3 p-8 text-center">
-          <div className="grid h-12 w-12 place-items-center rounded-full bg-canvas text-muted">
-            <Wallet size={22} />
-          </div>
-          <p className="text-sm text-muted">
-            The calculator quotes Swiss banks based on your renovation scope. Choose your modules
-            on Step 2 to see live offers here.
-          </p>
-          <Link
-            to="/plan"
-            className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold text-navy hover:bg-canvas"
-          >
-            <ArrowLeft size={14} /> Back to modules
-          </Link>
-        </Card>
-        <StepNav currentIndex={4} />
-      </>
-    );
-  }
-
   const cashOwn = Math.min(finance.ownFundsCash, renovationFundingNeed);
   const pensionOwnCap = Math.max(0, renovationFundingNeed - cashOwn);
   const pensionOwn = Math.min(finance.ownFundsPension, pensionOwnCap);
@@ -154,6 +126,34 @@ export const FinancialCalc = () => {
       }),
     [renovationLoan, activeRate, finance.term, finance.taxRate, totalCost, annualEnergySaving],
   );
+
+  if (selectedModules.length === 0) {
+    return (
+      <>
+        <SectionHeading
+          eyebrow="Step 5"
+          title="Financial calculator"
+          description="Pick at least one renovation module first — there's nothing to finance yet."
+        />
+        <Card className="flex flex-col items-center gap-3 p-8 text-center">
+          <div className="grid h-12 w-12 place-items-center rounded-full bg-canvas text-muted">
+            <Wallet size={22} />
+          </div>
+          <p className="text-sm text-muted">
+            The calculator quotes Swiss banks based on your renovation scope. Choose your modules
+            on Step 2 to see live offers here.
+          </p>
+          <Link
+            to="/plan"
+            className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold text-navy hover:bg-canvas"
+          >
+            <ArrowLeft size={14} /> Back to modules
+          </Link>
+        </Card>
+        <StepNav currentIndex={4} />
+      </>
+    );
+  }
 
   return (
     <>
