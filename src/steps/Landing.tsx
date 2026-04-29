@@ -907,13 +907,15 @@ const RenovationSequence = ({ onStart }: { onStart: () => void }) => {
     };
   }, [lastStage]);
 
-  // When the section collapses, compensate the scroll position so the user
-  // stays at the same visual content rather than getting jumped down the page.
+  // When the section collapses, land the user just past the (now-collapsed)
+  // section — at the top of the next section — so they continue forward
+  // instead of being yanked back through the house.
   useLayoutEffect(() => {
     if (!completed) return;
-    const shrinkPx = lastStage * window.innerHeight;
-    window.scrollBy(0, -shrinkPx);
-  }, [completed, lastStage]);
+    const el = sectionRef.current;
+    if (!el) return;
+    window.scrollTo(0, el.offsetTop + window.innerHeight);
+  }, [completed]);
 
   const seg = (from: number, to: number) => {
     if (progress <= from) return 0;
