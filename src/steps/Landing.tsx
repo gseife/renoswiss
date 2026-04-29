@@ -376,7 +376,7 @@ interface HouseSVGProps {
   windowsScale?: number;
   heatpumpY?: number;
   heatpumpOpacity?: number;
-  heatpumpUnderground?: boolean;
+  undergroundOpacity?: number;
 }
 
 const HouseSVG = ({
@@ -391,7 +391,7 @@ const HouseSVG = ({
   windowsScale = 1,
   heatpumpY = 0,
   heatpumpOpacity = 1,
-  heatpumpUnderground = false,
+  undergroundOpacity = 0,
 }: HouseSVGProps) => (
   <svg
     viewBox="-40 -120 880 720"
@@ -471,8 +471,9 @@ const HouseSVG = ({
       </clipPath>
     </defs>
 
-    {heatpumpUnderground && (
-      <g clipPath="url(#undergroundClip)">
+    {/* Underground earth — fades in smoothly as the heat pump descends */}
+    {undergroundOpacity > 0.001 && (
+      <g clipPath="url(#undergroundClip)" opacity={undergroundOpacity}>
         <rect x="-40" y="500" width="880" height="220" fill="url(#undergroundEarth)" />
         <rect x="-40" y="500" width="880" height="220" fill="url(#earthPat)" />
         <rect x="-40" y="540" width="880" height="2" fill="#000" opacity="0.12" />
@@ -480,19 +481,24 @@ const HouseSVG = ({
       </g>
     )}
 
-    {/* Underground earth (revealed when heat pump descends) */}
-    {heatpumpUnderground && (
-      <g clipPath="url(#undergroundClip)">
-        <rect x="-40" y="500" width="880" height="220" fill="url(#undergroundEarth)" />
-        <rect x="-40" y="500" width="880" height="220" fill="url(#earthPat)" />
-        <rect x="-40" y="540" width="880" height="2" fill="#000" opacity="0.12" />
-        <rect x="-40" y="600" width="880" height="2" fill="#000" opacity="0.10" />
-      </g>
-    )}
-
-    {/* Ground & contact shadow */}
+    {/* Ground line — soft cross-fade between grass and exposed soil edge */}
     <rect x="-40" y="500" width="880" height="20" fill="url(#ground)" />
-    <ellipse cx="360" cy="500" rx="260" ry="6" fill="#000" opacity="0.10" />
+    <rect
+      x="-40"
+      y="500"
+      width="880"
+      height="3"
+      fill="#3a2e20"
+      opacity={undergroundOpacity * 0.7}
+    />
+    <ellipse
+      cx="360"
+      cy="500"
+      rx="260"
+      ry="6"
+      fill="#000"
+      opacity={0.10 * (1 - undergroundOpacity * 0.6)}
+    />
 
     {/* Plinth — concrete strip at the base of the walls */}
     <g id="plinth">
@@ -655,32 +661,46 @@ const HouseSVG = ({
     )}
 
     {/* Heat pump — sits on the ground to the right of the house */}
-    <g id="heatpump" transform={`translate(0 ${heatpumpY})`} opacity={heatpumpOpacity}>
-      {heatpumpUnderground && (
-        <g opacity={Math.min(1, heatpumpY / 80)}>
+    <g id="heatpump" opacity={heatpumpOpacity}>
+      {/* Pipes — anchored at ground level, reach down to the descending unit */}
+      {undergroundOpacity > 0.001 && heatpumpY > 0.5 && (
+        <g opacity={undergroundOpacity}>
           <line
             x1="600"
-            y1="495"
+            y1="500"
             x2="600"
-            y2={495 + heatpumpY}
+            y2={500 + heatpumpY}
             stroke="#0E6655"
             strokeWidth="2"
-            opacity="0.7"
+            opacity="0.75"
           />
           <line
             x1="615"
-            y1="495"
+            y1="500"
             x2="615"
-            y2={495 + heatpumpY}
+            y2={500 + heatpumpY}
             stroke="#B8860B"
             strokeWidth="2"
-            opacity="0.7"
+            opacity="0.75"
           />
         </g>
       )}
-      {/* shadow */}
-      <ellipse cx="610" cy="498" rx="40" ry="4" fill="#000" opacity="0.20" />
-      {/* outdoor unit body — flat 2D rect with iso depth */}
+      {/* contact shadow — fades out as the unit moves underground */}
+      <ellipse
+        cx="610"
+        cy={498 + heatpumpY}
+        rx="40"
+        ry="4"
+        fill="#000"
+        opacity={0.20 * (1 - undergroundOpacity)}
+      />
+      {/* outdoor unit body — translated by heatpumpY only on the body */}
+    </g>
+    <g
+      id="heatpump-body"
+      transform={`translate(0 ${heatpumpY})`}
+      opacity={heatpumpOpacity}
+    >{/* outdoor unit body — flat 2D rect with iso depth */}
       <polygon points="585,496 635,496 635,460 585,460" fill="#dcdcd6" />
       <polygon points="635,460 635,496 645,491 645,455" fill="#bfbfb6" />
       <polygon points="585,460 635,460 645,455 595,455" fill="#eeeee6" />
@@ -924,7 +944,9 @@ const RenovationSequence = ({ onStart }: { onStart: () => void }) => {
   const heatpumpDown = seg(4, 5);
   const heatpumpReturn = seg(5.4, 6);
   const heatpumpY = lerp(0, 130, heatpumpDown) * (1 - heatpumpReturn);
-  const heatpumpUnderground = heatpumpDown > 0.05 && heatpumpReturn < 0.95;
+  // Smooth fade for the underground earth + geothermal pipes — replaces the
+  // old hard on/off so the transition no longer pops.
+  const undergroundOpacity = heatpumpDown * (1 - heatpumpReturn);
 
   const activeIdx = Math.min(
     RENO_STAGES.length - 1,
@@ -960,7 +982,7 @@ const RenovationSequence = ({ onStart }: { onStart: () => void }) => {
             windowsY={windowsY}
             windowsScale={windowsScale}
             heatpumpY={heatpumpY}
-            heatpumpUnderground={heatpumpUnderground}
+            undergroundOpacity={undergroundOpacity}
           />
         </div>
 
