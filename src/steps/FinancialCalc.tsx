@@ -445,9 +445,16 @@ export const FinancialCalc = () => {
           />
           <div className="my-3 border-t border-white/15" />
           <div className="flex items-baseline justify-between">
-            <span className="text-sm font-bold">Your net monthly cost</span>
-            <span className="font-serif text-2xl font-bold text-gold-soft">
-              {formatCHF(result.netMonthlyCost)}
+            <span className="text-sm font-bold">
+              {result.netMonthlyCost >= 0 ? "Your net monthly cost" : "Your net monthly savings"}
+            </span>
+            <span
+              className={clsx(
+                "font-serif text-2xl font-bold",
+                result.netMonthlyCost >= 0 ? "text-gold-soft" : "text-mint",
+              )}
+            >
+              {formatCHF(Math.abs(result.netMonthlyCost))}
             </span>
           </div>
         </Card>

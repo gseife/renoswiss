@@ -1,4 +1,4 @@
-import { Activity, TrendingDown, Wallet, Sparkles } from "lucide-react";
+import { Activity, TrendingDown, TrendingUp, Wallet, Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { computeTotals } from "@/lib/derived";
 import { formatCHF } from "@/lib/format";
@@ -22,9 +22,9 @@ export const SidebarDashboard = () => {
         <Row icon={Sparkles} label="GEAK" value={t.geakImprovement} tone="teal" highlight />
         <Row icon={Wallet} label="Net to finance" value={formatCHF(t.netFinancing)} />
         <Row
-          icon={TrendingDown}
-          label="Est. CHF/month"
-          value={formatCHF(Math.max(0, t.netMonthlyCostEstimate))}
+          icon={t.netMonthlyCostEstimate >= 0 ? TrendingDown : TrendingUp}
+          label={t.netMonthlyCostEstimate >= 0 ? "Est. monthly cost" : "Est. monthly savings"}
+          value={formatCHF(Math.abs(t.netMonthlyCostEstimate))}
           tone="emerald"
         />
       </div>
