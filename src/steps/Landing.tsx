@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -857,6 +857,8 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const RenovationSequence = ({ onStart }: { onStart: () => void }) => {
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const [progress, setProgress] = useState(0);
+  const [completed, setCompleted] = useState(false);
+  const lastStage = RENO_STAGES.length - 1;
 
   useEffect(() => {
     const onScroll = () => {
@@ -866,10 +868,15 @@ const RenovationSequence = ({ onStart }: { onStart: () => void }) => {
       const total = el.offsetHeight - window.innerHeight;
       const passed = Math.min(Math.max(-rect.top, 0), total);
       const t = total > 0 ? passed / total : 0;
-      const next = t * (RENO_STAGES.length - 1);
+      const next = t * lastStage;
       // Only advance forward — scrolling up freezes the house at its highest
       // reached state instead of reverse-splitting.
       setProgress((prev) => (next > prev ? next : prev));
+      // Once the animation has played out, mark complete so the section
+      // collapses to a single viewport (no more long pinned scroll).
+      if (next >= lastStage - 0.02) {
+        setCompleted(true);
+      }
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -878,7 +885,15 @@ const RenovationSequence = ({ onStart }: { onStart: () => void }) => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, []);
+  }, [lastStage]);
+
+  // When the section collapses, compensate the scroll position so the user
+  // stays at the same visual content rather than getting jumped down the page.
+  useLayoutEffect(() => {
+    if (!completed) return;
+    const shrinkPx = lastStage * window.innerHeight;
+    window.scrollBy(0, -shrinkPx);
+  }, [completed, lastStage]);
 
   const seg = (from: number, to: number) => {
     if (progress <= from) return 0;
@@ -917,7 +932,10 @@ const RenovationSequence = ({ onStart }: { onStart: () => void }) => {
   );
   const stage = RENO_STAGES[activeIdx];
 
-  const totalH = `${RENO_STAGES.length * 100}vh`;
+  // Full pinned-scroll height while the animation is playing. Once it has
+  // played out, collapse to a single viewport so scrolling back up doesn't
+  // require traversing the whole long section.
+  const totalH = completed ? "100vh" : `${RENO_STAGES.length * 100}vh`;
 
   return (
     <section ref={sectionRef} className="relative bg-canvas" style={{ height: totalH }}>
