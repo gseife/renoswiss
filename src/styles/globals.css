@@ -113,8 +113,16 @@
   header.sticky,
   nav,
   .no-print,
-  button {
+  header.sticky button,
+  aside button,
+  nav button {
     display: none !important;
+  }
+
+  /* Buttons that carry content (e.g. bank-offer cards) stay visible but
+     lose their interactive hover/cursor styling for print. */
+  button {
+    cursor: default !important;
   }
 
   /* Reset layout */

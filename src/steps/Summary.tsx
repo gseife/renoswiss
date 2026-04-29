@@ -11,7 +11,13 @@ import { moduleIcons } from "@/lib/icons";
 import { formatCHF, formatNumber } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { computeTotals, treesEquivalent, ESTIMATE_RATE, ESTIMATE_TERM } from "@/lib/derived";
+import {
+  computeTotals,
+  resolveActiveOffer,
+  treesEquivalent,
+  ESTIMATE_RATE,
+  ESTIMATE_TERM,
+} from "@/lib/derived";
 import { calcFinance } from "@/lib/finance";
 import { clsx } from "@/lib/clsx";
 import type { ModuleId } from "@/data/types";
@@ -20,10 +26,11 @@ const PROJECTION_YEARS = 15;
 
 export const Summary = () => {
   useDocumentTitle("Step 7 — Summary");
-  const { selectedModules, selectedContractors } = useStore();
+  const { selectedModules, selectedContractors, finance } = useStore();
   const [excluded, setExcluded] = useState<ModuleId | null>(null);
 
   const totals = computeTotals(selectedModules, selectedContractors);
+  const activeOffer = resolveActiveOffer(finance, totals);
 
   // Scenario compare: same totals but with one module excluded
   const compareModules = excluded
@@ -40,13 +47,17 @@ export const Summary = () => {
   const valueErosion = Math.round(BUILDING.estimatedValue * 0.06); // ~6% drag on property value
   const doNothingCost = energyOver15 + boilerReplacement + valueErosion;
 
+  const renoLoan = activeOffer?.renovationLoan ?? totals.netFinancing;
+  const renoRate = activeOffer?.rate ?? ESTIMATE_RATE;
+  const renoTerm = finance.term ?? ESTIMATE_TERM;
+
   const renovateOver15 =
-    totals.netFinancing +
+    renoLoan +
     calcFinance({
-      netFinancing: totals.netFinancing,
-      rate: ESTIMATE_RATE,
-      termYears: ESTIMATE_TERM,
-      marginalTaxRate: 25,
+      netFinancing: renoLoan,
+      rate: renoRate,
+      termYears: renoTerm,
+      marginalTaxRate: finance.taxRate,
       totalCost: totals.totalCost,
       annualEnergySaving: totals.annualEnergySaving,
     }).totalInterest -
@@ -190,12 +201,18 @@ export const Summary = () => {
             <strong className="text-emerald">{formatCHF(totals.totalSubsidies)}</strong>
           </div>
           <div>
-            <span className="text-muted">Net financing: </span>
-            <strong className="text-teal">{formatCHF(totals.netFinancing)}</strong>
+            <span className="text-muted">
+              {activeOffer ? "Loan from " + activeOffer.bankName : "Net financing"}:{" "}
+            </span>
+            <strong className="text-teal">{formatCHF(renoLoan)}</strong>
           </div>
           <div>
-            <span className="text-muted">Timeline: </span>
-            <strong className="text-navy">~5 months</strong>
+            <span className="text-muted">Rate: </span>
+            <strong className="text-navy">
+              {activeOffer
+                ? `${activeOffer.rate.toFixed(2)}% · ${activeOffer.productName}`
+                : `~${ESTIMATE_RATE}% (estimate)`}
+            </strong>
           </div>
         </div>
       </Card>

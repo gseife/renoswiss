@@ -16,7 +16,7 @@ export const StepNav = ({ currentIndex }: StepNavProps) => {
   const goNext = () => next && navigate(next.path);
 
   return (
-    <div className="mt-8 flex items-center justify-between gap-3 border-t border-line pt-5">
+    <div className="no-print mt-8 flex items-center justify-between gap-3 border-t border-line pt-5">
       <Button variant="secondary" size="md" onClick={goPrev}>
         <ArrowLeft size={16} />
         {prev ? prev.shortLabel : "Home"}

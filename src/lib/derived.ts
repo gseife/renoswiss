@@ -1,7 +1,9 @@
 import { MODULES } from "@/data/modules";
 import { SUBSIDIES } from "@/data/subsidies";
+import { BANKS } from "@/data/banks";
 import type { Contractor, ModuleId } from "@/data/types";
-import { calcFinance } from "./finance";
+import type { FinanceState } from "./store";
+import { calcAffordability, calcFinance, priceBankOffer } from "./finance";
 
 export interface PlanTotals {
   totalCost: number;
@@ -84,4 +86,77 @@ export const computeTotals = (
 export const treesEquivalent = (tonnesCO2PerYear: number): number => {
   // ~21 kg CO₂/yr per mature tree (commonly cited figure)
   return Math.round((tonnesCO2PerYear * 1000) / 21);
+};
+
+export interface ActiveOffer {
+  bankId: string;
+  bankName: string;
+  productName: string;
+  rate: number;
+  renovationLoan: number;
+  cashOwnFunds: number;
+  pensionOwnFunds: number;
+}
+
+/**
+ * Resolves the user's selected (or auto-picked cheapest) bank offer using the
+ * persisted finance inputs. Falls back to a generic estimate when no module
+ * is selected or when no bank approves.
+ */
+export const resolveActiveOffer = (
+  finance: FinanceState,
+  totals: PlanTotals,
+): ActiveOffer | null => {
+  if (totals.netFinancing <= 0) return null;
+
+  const ownFundsCap = Math.min(
+    finance.ownFundsCash + finance.ownFundsPension,
+    totals.netFinancing,
+  );
+  const renovationLoan = Math.max(0, totals.netFinancing - ownFundsCap);
+  if (renovationLoan <= 0) return null;
+
+  const totalMortgage = finance.existingMortgage + renovationLoan;
+  const propertyValueAfter = finance.propertyValue + Math.round(totals.totalCost * 0.18);
+  const affordability = calcAffordability({
+    grossIncome: finance.grossIncome,
+    propertyValueAfter,
+    totalMortgage,
+  });
+
+  const offers = BANKS.map((bank) => ({
+    bank,
+    offer: priceBankOffer({
+      baseRate: bank.rates[finance.selectedProductId],
+      greenDiscount: bank.greenDiscount,
+      ltv: affordability.ltv,
+      tragbarkeit: affordability.tragbarkeit,
+      isGreenEligible: totals.totalCost > 0,
+    }),
+  }));
+  const approved = offers.filter((o) => o.offer.approved);
+  if (approved.length === 0) return null;
+
+  const selected =
+    approved.find((o) => o.bank.id === finance.selectedBankId) ??
+    approved.reduce((best, o) =>
+      o.offer.effectiveRate < best.offer.effectiveRate ? o : best,
+    );
+
+  return {
+    bankId: selected.bank.id,
+    bankName: selected.bank.name,
+    productName: finance.selectedProductId === "saron"
+      ? "SARON"
+      : finance.selectedProductId === "fixed5"
+        ? "Fixed 5y"
+        : "Fixed 10y",
+    rate: selected.offer.effectiveRate,
+    renovationLoan,
+    cashOwnFunds: Math.min(finance.ownFundsCash, totals.netFinancing),
+    pensionOwnFunds: Math.min(
+      finance.ownFundsPension,
+      Math.max(0, totals.netFinancing - finance.ownFundsCash),
+    ),
+  };
 };
