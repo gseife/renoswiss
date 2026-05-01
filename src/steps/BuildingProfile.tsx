@@ -92,7 +92,16 @@ export const BuildingProfile = () => {
         </div>
       </Card>
 
-      <StepNav currentIndex={0} />
+      <p className="mt-4 text-[11px] leading-relaxed text-muted">
+        <strong className="text-ink/80">Demo data.</strong> The address above
+        is yours; the building characteristics, GEAK class and energy figures
+        are illustrative for this prototype. In a real deployment they'd be
+        pulled from <em>swisstopo</em> + <em>GWR</em> + an audit partner — see{" "}
+        <code className="rounded bg-canvas px-1 py-0.5 text-[10px]">docs/data-sourcing.md</code>
+        {" "}for the wiring plan.
+      </p>
+
+      <StepNav />
     </>
   );
 };

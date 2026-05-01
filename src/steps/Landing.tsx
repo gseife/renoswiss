@@ -81,7 +81,16 @@ export const Landing = () => {
 
       {hasResume && (
         <ResumePill
-          onContinue={() => navigate("/summary")}
+          onContinue={() => {
+            // Land the user on the earliest incomplete step instead of dumping
+            // them on /summary unconditionally.
+            const missingContractor = selectedModules.some(
+              (m) => !selectedContractors[m],
+            );
+            if (selectedModules.length === 0) navigate("/plan");
+            else if (missingContractor) navigate("/contractors");
+            else navigate("/summary");
+          }}
           onReset={() => {
             reset();
             setShowResume(false);

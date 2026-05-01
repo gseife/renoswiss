@@ -145,12 +145,12 @@ export const FinancialCalc = () => {
           </p>
           <Link
             to="/plan"
-            className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold text-navy hover:bg-canvas"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-semibold text-navy hover:bg-canvas"
           >
             <ArrowLeft size={14} /> Back to modules
           </Link>
         </Card>
-        <StepNav currentIndex={4} />
+        <StepNav />
       </>
     );
   }
@@ -324,7 +324,7 @@ export const FinancialCalc = () => {
                 aria-selected={active}
                 onClick={() => updateFinance({ selectedProductId: pid })}
                 className={clsx(
-                  "flex-1 rounded-md px-2 py-1.5 font-semibold transition-colors",
+                  "flex-1 rounded-lg px-2 py-1.5 font-semibold transition-colors",
                   active ? "bg-white text-navy shadow-soft" : "text-muted hover:text-ink",
                 )}
               >
@@ -593,7 +593,7 @@ export const FinancialCalc = () => {
         </Card>
       )}
 
-      <StepNav currentIndex={4} />
+      <StepNav />
     </>
   );
 };

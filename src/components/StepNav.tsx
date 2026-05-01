@@ -1,16 +1,19 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "./ui/Button";
-import { STEPS } from "@/data/steps";
+import { STEPS, stepIndex } from "@/data/steps";
 
 interface StepNavProps {
-  currentIndex: number;
+  /** Optional — when omitted, the current step is derived from the route. */
+  currentIndex?: number;
 }
 
 export const StepNav = ({ currentIndex }: StepNavProps) => {
   const navigate = useNavigate();
-  const prev = currentIndex > 0 ? STEPS[currentIndex - 1] : null;
-  const next = currentIndex < STEPS.length - 1 ? STEPS[currentIndex + 1] : null;
+  const location = useLocation();
+  const idx = currentIndex ?? stepIndex(location.pathname);
+  const prev = idx > 0 ? STEPS[idx - 1] : null;
+  const next = idx >= 0 && idx < STEPS.length - 1 ? STEPS[idx + 1] : null;
 
   const goPrev = () => (prev ? navigate(prev.path) : navigate("/"));
   const goNext = () => next && navigate(next.path);

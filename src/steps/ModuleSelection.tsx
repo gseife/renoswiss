@@ -123,7 +123,7 @@ export const ModuleSelection = () => {
         </Card>
       )}
 
-      <StepNav currentIndex={1} />
+      <StepNav />
     </>
   );
 };

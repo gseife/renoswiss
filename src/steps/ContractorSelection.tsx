@@ -60,7 +60,7 @@ export const ContractorSelection = () => {
             Pick at least one module on the previous step to see contractor matches.
           </p>
         </Card>
-        <StepNav currentIndex={2} />
+        <StepNav />
       </>
     );
   }
@@ -115,7 +115,7 @@ export const ContractorSelection = () => {
         </p>
       )}
 
-      <StepNav currentIndex={2} />
+      <StepNav />
     </>
   );
 };

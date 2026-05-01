@@ -1,5 +1,16 @@
 import { useState } from "react";
-import { Calendar, ArrowRight, Printer, Trees, AlertOctagon, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  Calendar,
+  ArrowLeft,
+  ArrowRight,
+  Printer,
+  Trees,
+  AlertOctagon,
+  ClipboardList,
+  Check,
+  X,
+} from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Stat } from "@/components/ui/Stat";
 import { Button } from "@/components/ui/Button";
@@ -26,8 +37,46 @@ const PROJECTION_YEARS = 15;
 
 export const Summary = () => {
   useDocumentTitle("Step 7 — Summary");
-  const { selectedModules, selectedContractors, finance } = useStore();
+  const {
+    selectedModules,
+    selectedContractors,
+    finance,
+    projectStart,
+    setProjectStart,
+  } = useStore();
   const [excluded, setExcluded] = useState<ModuleId | null>(null);
+  const [showBooking, setShowBooking] = useState(false);
+  const [bookedEmail, setBookedEmail] = useState<string | null>(null);
+
+  if (selectedModules.length === 0) {
+    return (
+      <>
+        <SectionHeading
+          eyebrow="Step 7"
+          title="Your renovation summary"
+          description="Pick at least one renovation module first — there's nothing to summarise yet."
+        />
+        <Card className="flex flex-col items-center gap-3 p-8 text-center">
+          <div className="grid h-12 w-12 place-items-center rounded-full bg-canvas text-muted">
+            <ClipboardList size={22} />
+          </div>
+          <p className="text-sm text-muted">
+            The summary pulls together your modules, contractors and financing.
+            Choose your modules on Step 2 to populate this page.
+          </p>
+          <Link
+            to="/plan"
+            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-navy hover:bg-canvas"
+          >
+            <ArrowLeft size={14} /> Back to modules
+          </Link>
+        </Card>
+        <div className="no-print">
+          <StepNav />
+        </div>
+      </>
+    );
+  }
 
   const totals = computeTotals(selectedModules, selectedContractors);
   const activeOffer = resolveActiveOffer(finance, totals);
@@ -248,24 +297,201 @@ export const Summary = () => {
         )}
       </Card>
 
-      <Card className="mt-3 p-6 text-center no-print">
-        <Button
-          size="lg"
-          onClick={() => alert("In a real product, this would open scheduling for the GEAK Plus audit.")}
-        >
-          <Calendar size={16} />
-          Book your free GEAK Plus audit
-          <ArrowRight size={16} />
-        </Button>
-        <p className="mt-3 text-[11px] text-muted">
-          Certified auditor visits within 5 business days · No obligations
-        </p>
-      </Card>
+      {bookedEmail ? (
+        <Card className="mt-6 border-l-4 border-l-emerald bg-emerald/5 p-6 no-print">
+          <div className="flex items-start gap-4">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald text-white">
+              <Check size={18} strokeWidth={3} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-navy">
+                Audit booked — invitation sent to{" "}
+                <span className="text-emerald">{bookedEmail}</span>
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                A certified GEAK auditor will arrive on{" "}
+                <strong className="text-navy">{formatLongDate(projectStart)}</strong>.
+                Demo complete — thanks for stepping through RenoSwiss.
+              </p>
+              <p className="mt-3 text-[11px] text-muted">
+                In a real product, the calendar invitation, contractor briefs and
+                subsidy applications would all dispatch from this confirmation.
+              </p>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <Card className="mt-6 p-6 text-center no-print">
+          <Button size="lg" onClick={() => setShowBooking(true)}>
+            <Calendar size={16} />
+            Book your free GEAK Plus audit
+            <ArrowRight size={16} />
+          </Button>
+          <p className="mt-3 text-[11px] text-muted">
+            Certified auditor visits within 5 business days · No obligations
+          </p>
+        </Card>
+      )}
 
       <div className="no-print">
-        <StepNav currentIndex={6} />
+        <StepNav />
       </div>
+
+      {showBooking && (
+        <BookingModal
+          initialDate={projectStart ?? ""}
+          onClose={() => setShowBooking(false)}
+          onConfirm={(date, email) => {
+            setProjectStart(date);
+            setBookedEmail(email);
+            setShowBooking(false);
+          }}
+        />
+      )}
     </>
+  );
+};
+
+const formatLongDate = (iso: string | null) => {
+  if (!iso) return "—";
+  const d = new Date(`${iso}T00:00:00`);
+  return d.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
+
+interface BookingModalProps {
+  initialDate: string;
+  onClose: () => void;
+  onConfirm: (date: string, email: string) => void;
+}
+
+const BookingModal = ({ initialDate, onClose, onConfirm }: BookingModalProps) => {
+  const [date, setDate] = useState(initialDate);
+  const [slot, setSlot] = useState<string>("09:00");
+  const [email, setEmail] = useState("");
+  const [touched, setTouched] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const min = today;
+  const dateObj = date ? new Date(`${date}T00:00:00`) : null;
+  const isWeekend =
+    dateObj && (dateObj.getDay() === 0 || dateObj.getDay() === 6);
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const dateValid = !!date && !isWeekend;
+  const valid = dateValid && emailValid;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="booking-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-navy/30 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-md rounded-2xl border border-line bg-white p-7 shadow-card"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-canvas hover:text-navy"
+        >
+          <X size={16} />
+        </button>
+
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-teal">
+          <span className="h-1.5 w-1.5 rounded-full bg-teal" />
+          Step 7 · Book audit
+        </div>
+        <h3
+          id="booking-title"
+          className="mt-3 font-serif text-[26px] font-bold leading-tight tracking-tight text-navy"
+        >
+          Pick a date for your GEAK audit.
+        </h3>
+        <p className="mt-2 text-[13px] leading-relaxed text-ink/70">
+          We'll send a calendar invitation with your auditor's details and the
+          on-site checklist.
+        </p>
+
+        <label className="mt-5 block text-[11px] font-semibold uppercase tracking-wider text-muted">
+          Audit date
+        </label>
+        <input
+          type="date"
+          value={date}
+          min={min}
+          onChange={(e) => setDate(e.target.value)}
+          onBlur={() => setTouched(true)}
+          className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-navy outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/20"
+        />
+        {isWeekend && (
+          <p className="mt-1 text-[11px] text-warning">
+            Auditors don't visit on weekends — pick a weekday.
+          </p>
+        )}
+
+        <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-muted">
+          Preferred slot
+        </label>
+        <div className="mt-1 grid grid-cols-3 gap-2">
+          {["09:00", "13:00", "16:00"].map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSlot(s)}
+              className={clsx(
+                "h-10 rounded-lg border text-[13px] font-semibold transition-colors",
+                slot === s
+                  ? "border-teal bg-teal/10 text-teal"
+                  : "border-line bg-white text-ink/70 hover:border-navy/40",
+              )}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+
+        <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-muted">
+          Email address
+        </label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => setTouched(true)}
+          placeholder="you@example.ch"
+          className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-navy outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/20"
+        />
+        {touched && !emailValid && (
+          <p className="mt-1 text-[11px] text-warning">
+            Please enter a valid email address.
+          </p>
+        )}
+
+        <div className="mt-6 flex items-center justify-end gap-2">
+          <Button variant="ghost" size="md" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            size="md"
+            disabled={!valid}
+            onClick={() => valid && onConfirm(date, email)}
+          >
+            Send invitation
+            <ArrowRight size={14} />
+          </Button>
+        </div>
+
+        <p className="mt-4 text-center text-[11px] text-muted">
+          Free · 90-minute on-site assessment · No obligations
+        </p>
+      </div>
+    </div>
   );
 };
 

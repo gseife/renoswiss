@@ -75,7 +75,7 @@ export const SubsidyView = () => {
         </div>
       </Card>
 
-      <StepNav currentIndex={3} />
+      <StepNav />
     </>
   );
 };

@@ -9,6 +9,7 @@ const STORAGE_KEYS = {
   contractors: "renoswiss.contractors.v1",
   address: "renoswiss.address.v1",
   finance: "renoswiss.finance.v1",
+  projectStart: "renoswiss.projectStart.v1",
 };
 
 const DEFAULT_MODULES: ModuleId[] = ["facade", "roof", "heating", "windows", "solar"];
@@ -45,10 +46,13 @@ interface Store {
   selectedContractors: ContractorSelection;
   address: string;
   finance: FinanceState;
+  /** ISO date (YYYY-MM-DD) of the project kick-off; null until the user sets one in Summary. */
+  projectStart: string | null;
   toggleModule: (id: ModuleId) => void;
   selectContractor: (moduleId: ModuleId, contractor: Contractor) => void;
   setAddress: (value: string) => void;
   updateFinance: (patch: Partial<FinanceState>) => void;
+  setProjectStart: (value: string | null) => void;
   reset: () => void;
 }
 
@@ -71,6 +75,10 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     STORAGE_KEYS.finance,
     DEFAULT_FINANCE,
   );
+  const [projectStart, setProjectStart] = usePersistedState<string | null>(
+    STORAGE_KEYS.projectStart,
+    null,
+  );
 
   const value = useMemo<Store>(
     () => ({
@@ -78,6 +86,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       selectedContractors,
       address,
       finance,
+      projectStart,
       toggleModule: (id) =>
         setSelectedModules((prev) => {
           if (prev.includes(id)) {
@@ -101,17 +110,20 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         }),
       setAddress,
       updateFinance: (patch) => setFinance((prev) => ({ ...prev, ...patch })),
+      setProjectStart,
       reset: () => {
         clearPersisted(
           STORAGE_KEYS.modules,
           STORAGE_KEYS.contractors,
           STORAGE_KEYS.address,
           STORAGE_KEYS.finance,
+          STORAGE_KEYS.projectStart,
         );
         setSelectedModules(DEFAULT_MODULES);
         setSelectedContractors({});
         setAddress(DEFAULT_ADDRESS);
         setFinance(DEFAULT_FINANCE);
+        setProjectStart(null);
       },
     }),
     [
@@ -119,10 +131,12 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       selectedContractors,
       address,
       finance,
+      projectStart,
       setSelectedModules,
       setSelectedContractors,
       setAddress,
       setFinance,
+      setProjectStart,
     ],
   );
 
