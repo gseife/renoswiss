@@ -99,17 +99,22 @@ export const Summary = () => {
   const renoLoan = activeOffer?.renovationLoan ?? totals.netFinancing;
   const renoRate = activeOffer?.rate ?? ESTIMATE_RATE;
   const renoTerm = finance.term ?? ESTIMATE_TERM;
+  const ownFunds = activeOffer
+    ? activeOffer.cashOwnFunds + activeOffer.pensionOwnFunds
+    : Math.min(finance.ownFundsCash + finance.ownFundsPension, totals.netFinancing);
+
+  const financeResult = calcFinance({
+    netFinancing: renoLoan,
+    rate: renoRate,
+    termYears: renoTerm,
+    marginalTaxRate: finance.taxRate,
+    totalCost: totals.totalCost,
+    annualEnergySaving: totals.annualEnergySaving,
+  });
 
   const renovateOver15 =
     renoLoan +
-    calcFinance({
-      netFinancing: renoLoan,
-      rate: renoRate,
-      termYears: renoTerm,
-      marginalTaxRate: finance.taxRate,
-      totalCost: totals.totalCost,
-      annualEnergySaving: totals.annualEnergySaving,
-    }).totalInterest -
+    financeResult.totalInterest -
     totals.annualEnergySaving * PROJECTION_YEARS;
 
   const lifetimeAdvantage = doNothingCost - renovateOver15;
@@ -240,30 +245,69 @@ export const Summary = () => {
       )}
 
       <Card className="mt-3 p-5">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div>
-            <span className="text-muted">Total cost: </span>
-            <strong className="text-navy">{formatCHF(totals.totalCost)}</strong>
-          </div>
-          <div>
-            <span className="text-muted">Subsidies: </span>
-            <strong className="text-emerald">{formatCHF(totals.totalSubsidies)}</strong>
-          </div>
-          <div>
-            <span className="text-muted">
-              {activeOffer ? "Loan from " + activeOffer.bankName : "Net financing"}:{" "}
-            </span>
-            <strong className="text-teal">{formatCHF(renoLoan)}</strong>
-          </div>
-          <div>
-            <span className="text-muted">Rate: </span>
-            <strong className="text-navy">
-              {activeOffer
-                ? `${activeOffer.rate.toFixed(2)}% · ${activeOffer.productName}`
-                : `~${ESTIMATE_RATE}% (estimate)`}
-            </strong>
-          </div>
+        <h3 className="mb-3 font-serif text-base font-bold text-navy">Financing</h3>
+        <dl className="space-y-2 text-sm">
+          <SummaryLine label="Total renovation cost" value={formatCHF(totals.totalCost)} bold />
+          <SummaryLine
+            label="Subsidies (pre-qualified)"
+            value={`− ${formatCHF(totals.totalSubsidies)}`}
+            positive
+          />
+          <SummaryLine
+            label="Own funds you bring (cash + pension)"
+            value={`− ${formatCHF(ownFunds)}`}
+            positive
+            muted={ownFunds === 0}
+          />
+        </dl>
+        <div className="my-3 border-t border-line" />
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm font-bold text-navy">
+            {renoLoan > 0
+              ? activeOffer
+                ? `Loan from ${activeOffer.bankName}`
+                : "New financing needed"
+              : "Fully covered"}
+          </span>
+          <span
+            className={clsx(
+              "font-serif text-xl font-bold",
+              renoLoan > 0 ? "text-teal" : "text-emerald",
+            )}
+          >
+            {formatCHF(renoLoan)}
+          </span>
         </div>
+
+        {renoLoan > 0 && (
+          <div className="mt-3 grid grid-cols-3 gap-3 rounded-lg border border-line bg-canvas/40 p-3 text-center text-xs">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted">Product · rate</div>
+              <div className="mt-0.5 font-bold text-navy">
+                {activeOffer
+                  ? `${activeOffer.productName} · ${activeOffer.rate.toFixed(2)}%`
+                  : `~${ESTIMATE_RATE}% (est.)`}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted">Term</div>
+              <div className="mt-0.5 font-bold text-navy">{renoTerm} yrs</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted">Monthly payment</div>
+              <div className="mt-0.5 font-bold text-navy">
+                {formatCHF(financeResult.monthlyPayment)}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {renoLoan > 0 && !activeOffer && (
+          <p className="mt-2 text-[11px] text-muted">
+            No bank locked in yet — the figures above use a {ESTIMATE_RATE}% indicative rate. Pick a
+            bank in the Calculator step to lock in a real offer.
+          </p>
+        )}
       </Card>
 
       {/* "Do nothing" baseline */}
@@ -533,6 +577,33 @@ const Delta = ({ label, before, after, format, inverted, beforeText, afterText }
     </div>
   );
 };
+
+const SummaryLine = ({
+  label,
+  value,
+  bold,
+  positive,
+  muted,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+  positive?: boolean;
+  muted?: boolean;
+}) => (
+  <div className="flex justify-between">
+    <span className={muted ? "text-muted" : "text-ink/80"}>{label}</span>
+    <span
+      className={clsx(
+        bold && "font-bold text-navy",
+        positive && !muted && "font-bold text-emerald",
+        muted && "text-muted",
+      )}
+    >
+      {value}
+    </span>
+  </div>
+);
 
 const BaselineRow = ({ label, value }: { label: string; value: string }) => (
   <li className="flex items-baseline justify-between gap-3">
