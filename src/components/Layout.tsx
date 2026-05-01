@@ -7,10 +7,14 @@ import { useKeyboardNav } from "@/lib/useKeyboardNav";
 export const Layout = () => {
   const location = useLocation();
   const idx = stepIndex(location.pathname);
-  const isLanding = location.pathname === "/";
+  const isFullBleed =
+    location.pathname === "/" ||
+    location.pathname === "/start" ||
+    location.pathname === "/how" ||
+    location.pathname.startsWith("/modules/");
   useKeyboardNav(idx);
 
-  if (isLanding) {
+  if (isFullBleed) {
     return <Outlet />;
   }
 

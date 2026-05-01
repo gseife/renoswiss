@@ -135,7 +135,7 @@ const PHASES: Phase[] = [
       "Smart thermostat and zone controls commissioned",
     ],
     youDo: [
-      "Pack a 10-day overnight bag — RenoSwiss books and pays the short-stay nearby",
+      "Pick your stay from curated options (Aparthotel, serviced flat, Airbnb) — you pay direct, we negotiate the rate",
       "Forward mail to the platform pickup address (one click)",
     ],
     optional: true,
@@ -376,7 +376,7 @@ export const Timeline = () => {
               value={totalRelocationDays > 0 ? `${totalRelocationDays}d` : "0"}
               label={
                 totalRelocationDays > 0
-                  ? "Relocation — we book it"
+                  ? "Relocation — options curated"
                   : "No relocation needed"
               }
             />
@@ -398,10 +398,10 @@ export const Timeline = () => {
                   You'll need to be out of the house for ~{totalRelocationDays} days.
                 </div>
                 <p className="mt-0.5">
-                  RenoSwiss books and pays for nearby short-stay accommodation
-                  (Aparthotel or serviced flat within 5 km) and arranges mail
-                  forwarding. The exact dates land in your dashboard once
-                  contractors confirm.
+                  We curate three options within 5 km — Aparthotel (~CHF 180/night),
+                  serviced flat (~CHF 130/night) and a vetted Airbnb (~CHF 90/night)
+                  — at pre-negotiated rates. You pick and pay directly, so there
+                  are no hidden mark-ups in the project price.
                 </p>
               </div>
             </Card>
@@ -510,9 +510,12 @@ export const Timeline = () => {
                                 <strong className="text-navy">
                                   Out for ~{st.relocationDays} days.
                                 </strong>{" "}
-                                RenoSwiss reserves an Aparthotel within 5 km, covers
-                                the cost, and arranges mail forwarding. Pets and
-                                kids welcome — flag any constraints in the dashboard.
+                                We pre-negotiate three transparent options within
+                                5 km (Aparthotel, serviced flat, Airbnb — roughly
+                                CHF 90–180 / night) and arrange mail forwarding. You
+                                book and pay the option you prefer — no mark-up on
+                                our side. Flag pets, kids or accessibility needs in
+                                the dashboard.
                               </span>
                             </div>
                           )}
@@ -575,12 +578,11 @@ export const Timeline = () => {
           <Card className="mt-5 border-0 !bg-navy p-5 text-white">
             <div className="grid grid-cols-2 gap-3">
               <Stat value={totalDurationLabel} label="With RenoSwiss" tone="white" />
-              <Stat value="18–30 mo" label="Without platform" tone="danger" />
+              <Stat value="12–18 mo" label="Without platform" tone="danger" />
             </div>
             <p className="mt-3 text-center text-[10px] text-white/60">
-              Without coordination, subsidies file sequentially (4–6 mo), banks
-              shop one-by-one (1–3 mo) and contractors don't run in parallel
-              (4–8 mo of construction).
+              Without coordination, subsidies file sequentially, banks are shopped
+              one-by-one, and contractors don't run in parallel.
             </p>
           </Card>
         </>

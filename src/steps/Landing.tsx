@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   ArrowUpRight,
+  BadgeCheck,
   Building2,
-  Check,
   RotateCcw,
+  Star,
   X,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -14,68 +15,40 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { computeTotals } from "@/lib/derived";
 import { clsx } from "@/lib/clsx";
 
-const ANALYZE_STEPS = [
-  "Reading GWR building register",
-  "Querying GEAK energy database",
-  "Matching cantonal subsidy programs",
-  "Comparing renovation benchmarks",
-];
-const STEP_DURATION = 420;
-
 export const Landing = () => {
   useDocumentTitle();
   const navigate = useNavigate();
   const { address, setAddress, selectedModules, selectedContractors, reset } = useStore();
   const [draft, setDraft] = useState(address);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analyzeStep, setAnalyzeStep] = useState(0);
   const [showResume, setShowResume] = useState(true);
 
   const hasResume =
     showResume &&
     (selectedModules.length > 0 || Object.keys(selectedContractors).length > 0);
 
-  useEffect(() => {
-    if (!analyzing) return;
-    if (analyzeStep >= ANALYZE_STEPS.length) {
-      const t = window.setTimeout(() => navigate("/building"), 350);
-      return () => window.clearTimeout(t);
-    }
-    const t = window.setTimeout(() => setAnalyzeStep((s) => s + 1), STEP_DURATION);
-    return () => window.clearTimeout(t);
-  }, [analyzing, analyzeStep, navigate]);
-
-  const start = () => {
-    if (draft.trim()) setAddress(draft.trim());
-    setAnalyzeStep(0);
-    setAnalyzing(true);
+  const startAnalysis = () => {
+    const value = draft.trim();
+    if (value) setAddress(value);
+    navigate("/start", { state: { autoStart: !!value } });
   };
-
-  if (analyzing) return <AnalyzingView step={analyzeStep} />;
 
   return (
     <div className="bg-white text-navy">
-      <NavBar
-        onStart={() =>
-          document
-            .getElementById("start")
-            ?.scrollIntoView({ behavior: "smooth", block: "start" })
-        }
-      />
+      <NavBar onAnalyze={() => navigate("/start")} onHow={() => navigate("/how")} />
 
-      <Hero />
+      <Hero onAnalyze={() => navigate("/start")} onHow={() => navigate("/how")} />
 
-      <RenovationSequence onStart={start} />
+      <RenovationSequence onStart={startAnalysis} />
 
-      <StartSection draft={draft} setDraft={setDraft} onSubmit={start} />
+      <StartSection draft={draft} setDraft={setDraft} onSubmit={startAnalysis} />
 
-      <HowItWorks />
+      <HowItWorksStrip />
 
       <BigStats />
 
       <ModuleGallery />
 
-      <FinalCTA onSubmit={start} draft={draft} setDraft={setDraft} />
+      <FinalCTA onSubmit={startAnalysis} draft={draft} setDraft={setDraft} />
 
       <Footer />
 
@@ -106,7 +79,13 @@ export const Landing = () => {
 /*  Nav                                                                       */
 /* -------------------------------------------------------------------------- */
 
-const NavBar = ({ onStart }: { onStart: () => void }) => {
+const NavBar = ({
+  onAnalyze,
+  onHow,
+}: {
+  onAnalyze: () => void;
+  onHow: () => void;
+}) => {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -126,12 +105,12 @@ const NavBar = ({ onStart }: { onStart: () => void }) => {
       <div className="mx-auto flex h-14 max-w-[1240px] items-center justify-between px-6">
         <Logo size="sm" />
         <nav className="hidden items-center gap-7 text-[13px] text-ink/80 md:flex">
-          <a href="#start" className="hover:text-navy">
+          <button type="button" onClick={onAnalyze} className="hover:text-navy">
             Start
-          </a>
-          <a href="#how" className="hover:text-navy">
+          </button>
+          <button type="button" onClick={onHow} className="hover:text-navy">
             How it works
-          </a>
+          </button>
           <a href="#numbers" className="hover:text-navy">
             Impact
           </a>
@@ -140,7 +119,7 @@ const NavBar = ({ onStart }: { onStart: () => void }) => {
           </a>
         </nav>
         <button
-          onClick={onStart}
+          onClick={onAnalyze}
           className="inline-flex h-8 items-center gap-1.5 rounded-full bg-navy px-3.5 text-[12px] font-semibold text-white transition-transform hover:scale-[1.03]"
         >
           Analyze
@@ -155,7 +134,13 @@ const NavBar = ({ onStart }: { onStart: () => void }) => {
 /*  Hero — oversized type                                                     */
 /* -------------------------------------------------------------------------- */
 
-const Hero = () => {
+const Hero = ({
+  onAnalyze,
+  onHow,
+}: {
+  onAnalyze: () => void;
+  onHow: () => void;
+}) => {
   const eyebrowRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onScroll = () => {
@@ -192,20 +177,22 @@ const Hero = () => {
         </p>
 
         <div className="mt-10 flex items-center justify-center gap-4 text-[14px]">
-          <a
-            href="#start"
+          <button
+            type="button"
+            onClick={onAnalyze}
             className="inline-flex h-11 items-center gap-2 rounded-full bg-navy px-6 font-semibold text-white transition-transform hover:scale-[1.03]"
           >
             Start free analysis
             <ArrowRight size={15} />
-          </a>
-          <a
-            href="#how"
+          </button>
+          <button
+            type="button"
+            onClick={onHow}
             className="inline-flex items-center gap-1.5 font-semibold text-teal hover:underline"
           >
             See how it works
             <ArrowUpRight size={14} />
-          </a>
+          </button>
         </div>
       </div>
     </section>
@@ -1283,10 +1270,11 @@ const BigKPI = ({
 };
 
 /* -------------------------------------------------------------------------- */
-/*  How it works — dark section                                               */
+/*  How it works strip — dark section on the landing page                     */
+/*  (full informative page lives in src/steps/HowItWorks.tsx)                 */
 /* -------------------------------------------------------------------------- */
 
-const HowItWorks = () => (
+const HowItWorksStrip = () => (
   <section id="how" className="relative overflow-hidden bg-navy py-28 text-white sm:py-36">
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_60%_at_80%_20%,rgba(14,102,85,0.45),transparent_70%)]" />
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(40%_50%_at_15%_80%,rgba(184,134,11,0.18),transparent_70%)]" />
@@ -1294,8 +1282,10 @@ const HowItWorks = () => (
     <div className="relative mx-auto max-w-[1240px] px-6">
       <Reveal>
         <Eyebrow tone="mint">From address to action</Eyebrow>
-        <h2 className="mt-4 max-w-3xl font-serif text-[40px] font-bold leading-[1.05] tracking-[-0.015em] sm:text-[64px]">
-          Four steps. <span className="text-mint">No spreadsheets.</span>
+        <h2 className="mt-4 max-w-3xl text-left font-serif text-[40px] font-bold leading-[1.05] tracking-[-0.015em] sm:text-[64px]">
+          Four steps.
+          <br />
+          <span className="text-mint">No spreadsheets.</span>
         </h2>
       </Reveal>
 
@@ -1347,27 +1337,33 @@ const BigStats = () => (
     <div className="mx-auto max-w-[1240px] px-6">
       <Reveal>
         <Eyebrow>The numbers</Eyebrow>
-        <h2 className="mt-4 max-w-3xl font-serif text-[40px] font-bold leading-[1.05] tracking-[-0.015em] text-navy sm:text-[64px]">
-          Built on <span className="text-teal">real Swiss data.</span>
+        <h2 className="mt-4 max-w-3xl text-left font-serif text-[40px] font-bold leading-[1.05] tracking-[-0.015em] text-navy sm:text-[64px]">
+          Built on
+          <br />
+          <span className="text-teal">real Swiss data.</span>
         </h2>
       </Reveal>
 
       <div className="mt-16 grid gap-px overflow-hidden rounded-3xl border border-line bg-line sm:grid-cols-3">
         {[
-          { v: "1,847", l: "Buildings analyzed", sub: "across 21 cantons" },
-          { v: "CHF 42M", l: "Subsidies captured", sub: "for our customers" },
-          { v: "4.7★", l: "Avg. satisfaction", sub: "on 1,200+ reviews" },
-        ].map((s, i) => (
-          <Reveal key={s.l} delay={i * 100}>
-            <div className="bg-white p-10 sm:p-14">
-              <div className="font-serif text-[56px] font-bold leading-none tracking-[-0.02em] text-navy sm:text-[80px]">
-                {s.v}
+          { icon: Building2, v: "1,847", l: "Buildings analyzed", sub: "across 21 cantons" },
+          { icon: BadgeCheck, v: "CHF 42M", l: "Subsidies captured", sub: "for our customers" },
+          { icon: Star, v: "4.7★", l: "Avg. satisfaction", sub: "on 1,200+ reviews" },
+        ].map((s, i) => {
+          const Icon = s.icon;
+          return (
+            <Reveal key={s.l} delay={i * 100}>
+              <div className="flex h-full min-h-[300px] flex-col bg-white p-10 sm:p-14">
+                <Icon size={26} strokeWidth={1.75} className="text-teal" />
+                <div className="mt-8 font-serif text-[56px] font-bold leading-none tracking-[-0.02em] text-navy sm:text-[80px]">
+                  {s.v}
+                </div>
+                <div className="mt-5 text-[14px] font-semibold text-navy">{s.l}</div>
+                <div className="text-[13px] text-muted">{s.sub}</div>
               </div>
-              <div className="mt-5 text-[14px] font-semibold text-navy">{s.l}</div>
-              <div className="text-[13px] text-muted">{s.sub}</div>
-            </div>
-          </Reveal>
-        ))}
+            </Reveal>
+          );
+        })}
       </div>
     </div>
   </section>
@@ -1438,17 +1434,22 @@ const ModuleGallery = () => (
 );
 
 const ModuleCard = ({
+  id,
   name,
   desc,
   chip,
   art,
 }: {
+  id: string;
   name: string;
   desc: string;
   chip: string;
   art: "facade" | "heat" | "solar" | "windows";
 }) => (
-  <div className="group flex h-full flex-col overflow-hidden rounded-3xl border border-line bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-card">
+  <Link
+    to={`/modules/${id}`}
+    className="group flex h-full flex-col overflow-hidden rounded-3xl border border-line bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/60"
+  >
     <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-surface to-canvas">
       <ModuleArt kind={art} />
       <span className="absolute left-4 top-4 rounded-full border border-line bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-teal backdrop-blur">
@@ -1458,11 +1459,11 @@ const ModuleCard = ({
     <div className="flex flex-1 flex-col p-5">
       <div className="font-serif text-[20px] font-bold text-navy">{name}</div>
       <div className="mt-1 text-[13px] text-muted">{desc}</div>
-      <div className="mt-auto pt-4 text-[12px] font-semibold uppercase tracking-wider text-teal opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="mt-auto pt-4 text-[12px] font-semibold uppercase tracking-wider text-teal opacity-60 transition-opacity group-hover:opacity-100">
         Explore →
       </div>
     </div>
-  </div>
+  </Link>
 );
 
 const ModuleArt = ({ kind }: { kind: "facade" | "heat" | "solar" | "windows" }) => {
@@ -1779,65 +1780,3 @@ const Eyebrow = ({
   );
 };
 
-/* -------------------------------------------------------------------------- */
-/*  Analyzing view                                                            */
-/* -------------------------------------------------------------------------- */
-
-const AnalyzingView = ({ step }: { step: number }) => (
-  <div className="flex min-h-screen items-center justify-center bg-white px-6">
-    <div className="w-full max-w-md text-center">
-      <Logo size="lg" />
-      <h2 className="mt-10 font-serif text-[28px] font-bold tracking-[-0.01em] text-navy">
-        Reading your building…
-      </h2>
-      <p className="mt-2 text-[14px] text-muted">
-        Cross-referencing official Swiss data sources.
-      </p>
-
-      <ol className="mt-10 space-y-2 text-left">
-        {ANALYZE_STEPS.map((label, i) => {
-          const done = i < step;
-          const current = i === step;
-          return (
-            <li
-              key={label}
-              className={clsx(
-                "flex items-center gap-3 rounded-xl border px-4 py-3 transition-all duration-300",
-                done && "border-emerald/30 bg-emerald/5",
-                current && "border-teal/30 bg-teal/5",
-                !done && !current && "border-line bg-white opacity-50",
-              )}
-            >
-              <span
-                className={clsx(
-                  "grid h-6 w-6 shrink-0 place-items-center rounded-full",
-                  done && "bg-emerald text-white",
-                  current && "bg-teal text-white",
-                  !done && !current && "bg-line text-muted",
-                )}
-              >
-                {done ? (
-                  <Check size={12} strokeWidth={3} />
-                ) : current ? (
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
-                ) : (
-                  <span className="text-[10px] font-bold">{i + 1}</span>
-                )}
-              </span>
-              <span
-                className={clsx(
-                  "text-sm",
-                  done && "text-emerald",
-                  current && "font-semibold text-navy",
-                  !done && !current && "text-muted",
-                )}
-              >
-                {label}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  </div>
-);

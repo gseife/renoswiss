@@ -5,6 +5,9 @@ import { StoreProvider } from "@/lib/store";
 import { ToastProvider } from "@/lib/toast";
 
 const Landing = lazy(() => import("@/steps/Landing").then((m) => ({ default: m.Landing })));
+const StartAnalysis = lazy(() => import("@/steps/StartAnalysis").then((m) => ({ default: m.StartAnalysis })));
+const HowItWorksPage = lazy(() => import("@/steps/HowItWorks").then((m) => ({ default: m.HowItWorks })));
+const ModuleDetail = lazy(() => import("@/steps/ModuleDetail").then((m) => ({ default: m.ModuleDetail })));
 const BuildingProfile = lazy(() => import("@/steps/BuildingProfile").then((m) => ({ default: m.BuildingProfile })));
 const ModuleSelection = lazy(() => import("@/steps/ModuleSelection").then((m) => ({ default: m.ModuleSelection })));
 const ContractorSelection = lazy(() => import("@/steps/ContractorSelection").then((m) => ({ default: m.ContractorSelection })));
@@ -30,6 +33,30 @@ export const App = () => (
               element={
                 <Suspense fallback={<StepFallback />}>
                   <Landing />
+                </Suspense>
+              }
+            />
+            <Route
+              path="start"
+              element={
+                <Suspense fallback={<StepFallback />}>
+                  <StartAnalysis />
+                </Suspense>
+              }
+            />
+            <Route
+              path="how"
+              element={
+                <Suspense fallback={<StepFallback />}>
+                  <HowItWorksPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="modules/:id"
+              element={
+                <Suspense fallback={<StepFallback />}>
+                  <ModuleDetail />
                 </Suspense>
               }
             />
