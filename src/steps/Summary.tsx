@@ -16,11 +16,10 @@ import { Stat } from "@/components/ui/Stat";
 import { Button } from "@/components/ui/Button";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { StepNav } from "@/components/StepNav";
-import { MODULES } from "@/data/modules";
-import { BUILDING } from "@/data/building";
 import { moduleIcons } from "@/lib/icons";
 import { formatCHF, formatNumber } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { useScaledModules } from "@/lib/useScaledModules";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   computeTotals,
@@ -43,7 +42,9 @@ export const Summary = () => {
     finance,
     projectStart,
     setProjectStart,
+    building,
   } = useStore();
+  const modules = useScaledModules();
   const [excluded, setExcluded] = useState<ModuleId | null>(null);
   const [showBooking, setShowBooking] = useState(false);
   const [bookedEmail, setBookedEmail] = useState<string | null>(null);
@@ -78,22 +79,22 @@ export const Summary = () => {
     );
   }
 
-  const totals = computeTotals(selectedModules, selectedContractors);
+  const totals = computeTotals(selectedModules, selectedContractors, modules);
   const activeOffer = resolveActiveOffer(finance, totals);
 
   // Scenario compare: same totals but with one module excluded
   const compareModules = excluded
     ? selectedModules.filter((id) => id !== excluded)
     : selectedModules;
-  const compareTotals = computeTotals(compareModules, selectedContractors);
+  const compareTotals = computeTotals(compareModules, selectedContractors, modules);
 
   const trees = treesEquivalent(totals.annualCO2Saving);
 
   // "Do nothing" baseline: 15 years of energy bills + boiler replacement +
   // a conservative property-value erosion as energy standards tighten.
-  const energyOver15 = BUILDING.annualCost * PROJECTION_YEARS;
+  const energyOver15 = building.annualCost * PROJECTION_YEARS;
   const boilerReplacement = 18_000; // typical oil/gas replacement cost
-  const valueErosion = Math.round(BUILDING.estimatedValue * 0.06); // ~6% drag on property value
+  const valueErosion = Math.round(building.estimatedValue * 0.06); // ~6% drag on property value
   const doNothingCost = energyOver15 + boilerReplacement + valueErosion;
 
   const renoLoan = activeOffer?.renovationLoan ?? totals.netFinancing;
@@ -165,7 +166,7 @@ export const Summary = () => {
       </p>
       <div className="space-y-2">
         {selectedModules.map((id) => {
-          const mod = MODULES.find((m) => m.id === id);
+          const mod = modules.find((m) => m.id === id);
           if (!mod) return null;
           const ct = selectedContractors[id];
           const Icon = moduleIcons[mod.iconKey] ?? moduleIcons.facade;
@@ -215,7 +216,7 @@ export const Summary = () => {
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold text-navy">
-                Without {MODULES.find((m) => m.id === excluded)?.name}
+                Without {modules.find((m) => m.id === excluded)?.name}
               </div>
               <div className="mt-2 grid grid-cols-3 gap-3">
                 <Delta label="Cost" before={totals.totalCost} after={compareTotals.totalCost} format={formatCHF} />
@@ -320,7 +321,7 @@ export const Summary = () => {
         </p>
         <ul className="space-y-2 text-sm">
           <BaselineRow
-            label={`Energy bills (${formatCHF(BUILDING.annualCost)}/yr × ${PROJECTION_YEARS} yrs)`}
+            label={`Energy bills (${formatCHF(building.annualCost)}/yr × ${PROJECTION_YEARS} yrs)`}
             value={formatCHF(energyOver15)}
           />
           <BaselineRow label="Forced boiler replacement (lifespan exceeded)" value={formatCHF(boilerReplacement)} />

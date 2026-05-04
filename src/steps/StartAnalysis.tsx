@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowRight, Building2, Check } from "lucide-react";
+import { ArrowRight, Building2, Check, MapPin } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useStore } from "@/lib/store";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { clsx } from "@/lib/clsx";
+import {
+  searchAddresses,
+  type AddressSuggestion,
+} from "@/lib/gis/geoadmin";
+import { analyzeAddress } from "@/lib/gis/analyze";
+import { gateForModule } from "@/lib/gis/eligibilityGate";
 
 const ANALYZE_STEPS = [
   "Reading GWR building register",
@@ -13,6 +19,7 @@ const ANALYZE_STEPS = [
   "Comparing renovation benchmarks",
 ];
 const STEP_DURATION = 420;
+const SEARCH_DEBOUNCE_MS = 220;
 
 type StartLocationState = { autoStart?: boolean } | null;
 
@@ -20,19 +27,68 @@ export const StartAnalysis = () => {
   useDocumentTitle("Start your free analysis");
   const navigate = useNavigate();
   const location = useLocation();
-  const { address, setAddress } = useStore();
+  const {
+    address,
+    setAddress,
+    setAddressMeta,
+    setLiveBuilding,
+    setEligibility,
+    selectedModules,
+    setSelectedModules,
+  } = useStore();
 
   const initialAuto = (location.state as StartLocationState)?.autoStart === true;
 
   const [draft, setDraft] = useState(address);
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [chosen, setChosen] = useState<AddressSuggestion | null>(null);
+  const [showList, setShowList] = useState(false);
   const [analyzing, setAnalyzing] = useState(initialAuto);
   const [step, setStep] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (!analyzing && inputRef.current) inputRef.current.focus();
   }, [analyzing]);
 
+  // Debounced address search.
+  useEffect(() => {
+    const trimmed = draft.trim();
+    if (trimmed.length < 3 || chosen?.label === trimmed) {
+      setSuggestions([]);
+      return;
+    }
+    const ctrl = new AbortController();
+    const t = window.setTimeout(() => {
+      searchAddresses(trimmed, { signal: ctrl.signal })
+        .then(setSuggestions)
+        .catch(() => {
+          /* abort or network — stay silent, keep last suggestions */
+        });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      window.clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [draft, chosen]);
+
+  // Close the dropdown when clicking outside the form.
+  useEffect(() => {
+    if (!showList) return;
+    const onClick = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setShowList(false);
+      }
+    };
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, [showList]);
+
+  // Drive the analyze step animation + auto-navigate.
   useEffect(() => {
     if (!analyzing) return;
     if (step >= ANALYZE_STEPS.length) {
@@ -43,12 +99,55 @@ export const StartAnalysis = () => {
     return () => window.clearTimeout(t);
   }, [analyzing, step, navigate]);
 
+  const pickSuggestion = (s: AddressSuggestion) => {
+    setDraft(s.label);
+    setChosen(s);
+    setSuggestions([]);
+    setShowList(false);
+  };
+
+  const runAnalysis = async (typed: string, picked: AddressSuggestion | null) => {
+    let target = picked;
+    if (!target) {
+      const [first] = await searchAddresses(typed).catch(
+        () => [] as AddressSuggestion[],
+      );
+      target = first ?? null;
+    }
+    if (!target) {
+      setAddress(typed);
+      setAddressMeta(null);
+      setLiveBuilding(null);
+      setEligibility(null);
+      return;
+    }
+    setAddress(target.label);
+    const result = await analyzeAddress(target.lv95, {
+      addressLabel: target.label,
+    }).catch(() => null);
+    setAddressMeta({ lv95: target.lv95, egid: result?.egid ?? null });
+    setLiveBuilding(result?.building ?? null);
+    setEligibility(result?.eligibility ?? null);
+
+    // Drop modules that the federal data tells us not to recommend.
+    if (result?.eligibility) {
+      const pruned = selectedModules.filter(
+        (id) => !gateForModule(id, result.eligibility).skipped,
+      );
+      if (pruned.length !== selectedModules.length) {
+        setSelectedModules(pruned);
+      }
+    }
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const value = draft.trim();
-    if (value) setAddress(value);
+    if (!value) return;
+    setShowList(false);
     setStep(0);
     setAnalyzing(true);
+    void runAnalysis(value, chosen);
   };
 
   if (analyzing) return <AnalyzingView step={step} />;
@@ -72,14 +171,25 @@ export const StartAnalysis = () => {
           home.
         </p>
 
-        <form onSubmit={submit} className="mx-auto mt-10 max-w-md text-left">
+        <form
+          onSubmit={submit}
+          className="relative mx-auto mt-10 max-w-md text-left"
+          ref={containerRef}
+        >
           <div className="group relative flex h-14 items-center rounded-full border border-line bg-white pl-5 pr-1.5 transition-all focus-within:border-teal focus-within:shadow-card">
             <Building2 size={17} className="text-muted" />
             <input
               ref={inputRef}
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                setChosen(null);
+                setShowList(true);
+              }}
+              onFocus={() => setShowList(true)}
               placeholder="Musterstrasse 42, 8001 Zürich"
+              autoComplete="off"
+              spellCheck={false}
               className="ml-3 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted/70"
             />
             <button
@@ -90,6 +200,27 @@ export const StartAnalysis = () => {
               <ArrowRight size={14} />
             </button>
           </div>
+
+          {showList && suggestions.length > 0 && (
+            <ul className="absolute left-0 right-0 top-[calc(100%+6px)] z-10 max-h-72 overflow-auto rounded-2xl border border-line bg-white py-1 text-[14px] shadow-card">
+              {suggestions.map((s) => (
+                <li key={`${s.featureId}-${s.label}`}>
+                  <button
+                    type="button"
+                    onClick={() => pickSuggestion(s)}
+                    className="flex w-full items-start gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-canvas"
+                  >
+                    <MapPin
+                      size={14}
+                      className="mt-1 shrink-0 text-muted"
+                    />
+                    <span className="text-ink">{s.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
           <p className="mt-3 pl-2 text-[12px] text-muted">
             Free · No obligations · No account
           </p>

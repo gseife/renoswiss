@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BankLogo } from "@/components/ui/BankLogo";
 import { StepNav } from "@/components/StepNav";
-import { MODULES } from "@/data/modules";
+import { useScaledModules } from "@/lib/useScaledModules";
 import { SUBSIDIES } from "@/data/subsidies";
 import { BANKS, PRODUCTS, PRODUCT_ORDER, type Bank } from "@/data/banks";
 import { formatCHF } from "@/lib/format";
@@ -27,15 +27,16 @@ const STRESS_DELTAS = [-2, -1, 0, 1, 2, 3] as const;
 export const FinancialCalc = () => {
   useDocumentTitle("Step 5 — Calculator");
   const { selectedModules, selectedContractors, finance, updateFinance } = useStore();
+  const modules = useScaledModules();
 
   const totalCost = selectedModules.reduce((s, id) => {
     const ct = selectedContractors[id];
-    const mod = MODULES.find((m) => m.id === id);
+    const mod = modules.find((m) => m.id === id);
     return s + (ct ? ct.price : (mod?.estCost ?? 0));
   }, 0);
   const totalSubsidies = SUBSIDIES.reduce((s, sub) => s + sub.amount, 0);
   const annualEnergySaving = selectedModules.reduce(
-    (s, id) => s + (MODULES.find((m) => m.id === id)?.energySaving ?? 0),
+    (s, id) => s + (modules.find((m) => m.id === id)?.energySaving ?? 0),
     0,
   );
   const renovationFundingNeed = Math.max(0, totalCost - totalSubsidies);

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useStore } from "@/lib/store";
+import { useScaledModules } from "@/lib/useScaledModules";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { computeTotals } from "@/lib/derived";
 import { clsx } from "@/lib/clsx";
@@ -1673,7 +1674,8 @@ const ResumePill = ({
   onDismiss: () => void;
 }) => {
   const { selectedModules, selectedContractors } = useStore();
-  const totals = computeTotals(selectedModules, selectedContractors);
+  const modules = useScaledModules();
+  const totals = computeTotals(selectedModules, selectedContractors, modules);
   return (
     <div className="fixed bottom-5 right-5 z-50 flex max-w-[340px] items-center gap-3 rounded-2xl border border-line bg-white/90 p-3 pl-4 shadow-card backdrop-blur-xl">
       <div className="min-w-0">

@@ -2,19 +2,20 @@ import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { MODULE_DETAILS, type ModuleDetailContent } from "@/data/moduleDetails";
-import { MODULES } from "@/data/modules";
 import type { ModuleId } from "@/data/types";
 import { useStore } from "@/lib/store";
+import { useScaledModules } from "@/lib/useScaledModules";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 const KNOWN_IDS: ModuleId[] = ["facade", "heating", "solar", "windows"];
 
 export const ModuleDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const modules = useScaledModules();
   const detail = id && (KNOWN_IDS as string[]).includes(id)
     ? MODULE_DETAILS[id as ModuleId]
     : undefined;
-  const baseModule = id ? MODULES.find((m) => m.id === id) : undefined;
+  const baseModule = id ? modules.find((m) => m.id === id) : undefined;
 
   useDocumentTitle(baseModule?.name ?? "Module");
 

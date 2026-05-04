@@ -1,16 +1,18 @@
-import { Check } from "lucide-react";
+import { Check, MinusCircle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Stat } from "@/components/ui/Stat";
 import { Badge } from "@/components/ui/Badge";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { StepNav } from "@/components/StepNav";
-import { MODULES } from "@/data/modules";
 import { moduleIcons } from "@/lib/icons";
 import { formatCHF } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { useScaledModules } from "@/lib/useScaledModules";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { useToast } from "@/lib/toast";
 import { clsx } from "@/lib/clsx";
+import { gateForModule } from "@/lib/gis/eligibilityGate";
+import { reasonForModule } from "@/lib/gis/moduleCopy";
 import type { Priority, ModuleId } from "@/data/types";
 
 const priorityTone: Record<Priority, "danger" | "gold" | "muted"> = {
@@ -21,11 +23,12 @@ const priorityTone: Record<Priority, "danger" | "gold" | "muted"> = {
 
 export const ModuleSelection = () => {
   useDocumentTitle("Step 2 — Renovation Plan");
-  const { selectedModules, toggleModule } = useStore();
+  const { selectedModules, toggleModule, eligibility, building } = useStore();
+  const modules = useScaledModules();
   const toast = useToast();
   const handleToggle = (id: ModuleId) => {
     const wasSelected = selectedModules.includes(id);
-    const mod = MODULES.find((m) => m.id === id);
+    const mod = modules.find((m) => m.id === id);
     toggleModule(id);
     if (mod) {
       toast(
@@ -34,14 +37,12 @@ export const ModuleSelection = () => {
       );
     }
   };
-  const totalCost = MODULES.filter((m) => selectedModules.includes(m.id)).reduce(
-    (s, m) => s + m.estCost,
-    0,
-  );
-  const totalSaving = MODULES.filter((m) => selectedModules.includes(m.id)).reduce(
-    (s, m) => s + m.energySaving,
-    0,
-  );
+  const totalCost = modules
+    .filter((m) => selectedModules.includes(m.id))
+    .reduce((s, m) => s + m.estCost, 0);
+  const totalSaving = modules
+    .filter((m) => selectedModules.includes(m.id))
+    .reduce((s, m) => s + m.energySaving, 0);
 
   return (
     <>
@@ -52,22 +53,29 @@ export const ModuleSelection = () => {
       />
 
       <div className="space-y-2">
-        {MODULES.map((m) => {
+        {modules.map((m) => {
           const sel = selectedModules.includes(m.id);
           const Icon = moduleIcons[m.iconKey] ?? moduleIcons.facade;
+          const gate = gateForModule(m.id, eligibility);
+          const interactive = !gate.skipped;
           return (
             <Card
               key={m.id}
               className={clsx(
-                "cursor-pointer p-4 transition-all",
-                sel ? "border-teal bg-teal/[0.03]" : "hover:border-ink/20",
+                "p-4 transition-all",
+                interactive && "cursor-pointer",
+                gate.skipped && "opacity-60",
+                sel && interactive && "border-teal bg-teal/[0.03]",
+                interactive && !sel && "hover:border-ink/20",
               )}
-              hoverable={!sel}
-              onClick={() => handleToggle(m.id)}
-              role="button"
-              aria-pressed={sel}
-              tabIndex={0}
+              hoverable={interactive && !sel}
+              onClick={interactive ? () => handleToggle(m.id) : undefined}
+              role={interactive ? "button" : undefined}
+              aria-pressed={interactive ? sel : undefined}
+              aria-disabled={!interactive}
+              tabIndex={interactive ? 0 : -1}
               onKeyDown={(e) => {
+                if (!interactive) return;
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
                   handleToggle(m.id);
@@ -78,24 +86,62 @@ export const ModuleSelection = () => {
                 <div
                   className={clsx(
                     "grid h-10 w-10 shrink-0 place-items-center rounded-lg transition-colors",
-                    sel ? "bg-teal text-white" : "bg-canvas text-ink/70",
+                    gate.skipped
+                      ? "bg-canvas text-muted"
+                      : sel
+                        ? "bg-teal text-white"
+                        : "bg-canvas text-ink/70",
                   )}
                 >
-                  {sel ? <Check size={18} strokeWidth={3} /> : <Icon size={18} />}
+                  {gate.skipped ? (
+                    <MinusCircle size={18} />
+                  ) : sel ? (
+                    <Check size={18} strokeWidth={3} />
+                  ) : (
+                    <Icon size={18} />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-navy">{m.name}</span>
-                    <Badge tone={priorityTone[m.priority]}>{m.priority}</Badge>
+                    <span
+                      className={clsx(
+                        "text-sm font-semibold",
+                        gate.skipped ? "text-muted line-through" : "text-navy",
+                      )}
+                    >
+                      {m.name}
+                    </span>
+                    {gate.skipped ? (
+                      <Badge tone="muted">Skipped</Badge>
+                    ) : (
+                      <Badge tone={priorityTone[m.priority]}>{m.priority}</Badge>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-muted">{m.desc}</p>
-                  <p className="mt-2 text-xs italic text-teal">{m.reason}</p>
+                  {gate.skipped && gate.reason ? (
+                    <p className="mt-2 text-xs italic text-emerald">
+                      {gate.reason}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs italic text-teal">
+                      {reasonForModule(m.id, m.reason, { building, eligibility })}
+                    </p>
+                  )}
                 </div>
                 <div className="shrink-0 text-right">
-                  <div className="text-base font-bold text-navy">{formatCHF(m.estCost)}</div>
-                  <div className="text-xs font-medium text-emerald">
-                    −{formatCHF(m.energySaving)}/yr
+                  <div
+                    className={clsx(
+                      "text-base font-bold",
+                      gate.skipped ? "text-muted line-through" : "text-navy",
+                    )}
+                  >
+                    {formatCHF(m.estCost)}
                   </div>
+                  {!gate.skipped && (
+                    <div className="text-xs font-medium text-emerald">
+                      −{formatCHF(m.energySaving)}/yr
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>
@@ -115,7 +161,7 @@ export const ModuleSelection = () => {
             <Stat value={formatCHF(totalCost)} label="Estimated total" tone="white" />
             <Stat value={formatCHF(totalSaving)} label="Annual savings" tone="mint" />
             <Stat
-              value={`${selectedModules.length} of ${MODULES.length}`}
+              value={`${selectedModules.length} of ${modules.length}`}
               label="Modules selected"
               tone="gold"
             />

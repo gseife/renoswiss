@@ -1,7 +1,7 @@
 import { MODULES } from "@/data/modules";
 import { SUBSIDIES } from "@/data/subsidies";
 import { BANKS } from "@/data/banks";
-import type { Contractor, ModuleId } from "@/data/types";
+import type { Contractor, Module, ModuleId } from "@/data/types";
 import type { FinanceState } from "./store";
 import { calcAffordability, calcFinance, priceBankOffer } from "./finance";
 
@@ -26,10 +26,11 @@ export const ESTIMATE_TAX_RATE = 25;
 export const computeTotals = (
   selectedModules: ModuleId[],
   selectedContractors: Partial<Record<ModuleId, Contractor>>,
+  modules: Module[] = MODULES,
 ): PlanTotals => {
   const totalCost = selectedModules.reduce((s, id) => {
     const ct = selectedContractors[id];
-    const mod = MODULES.find((m) => m.id === id);
+    const mod = modules.find((m) => m.id === id);
     return s + (ct ? ct.price : (mod?.estCost ?? 0));
   }, 0);
 
@@ -37,12 +38,12 @@ export const computeTotals = (
   const netFinancing = Math.max(0, totalCost - totalSubsidies);
 
   const annualEnergySaving = selectedModules.reduce(
-    (s, id) => s + (MODULES.find((m) => m.id === id)?.energySaving ?? 0),
+    (s, id) => s + (modules.find((m) => m.id === id)?.energySaving ?? 0),
     0,
   );
 
   const annualCO2Saving = selectedModules.reduce(
-    (s, id) => s + (MODULES.find((m) => m.id === id)?.co2Saving ?? 0),
+    (s, id) => s + (modules.find((m) => m.id === id)?.co2Saving ?? 0),
     0,
   );
 
@@ -78,7 +79,7 @@ export const computeTotals = (
     monthlyPaymentEstimate: finance.monthlyPayment,
     netMonthlyCostEstimate: finance.netMonthlyCost,
     modulesSelected: selectedModules.length,
-    modulesTotal: MODULES.length,
+    modulesTotal: modules.length,
     contractorsChosen,
   };
 };

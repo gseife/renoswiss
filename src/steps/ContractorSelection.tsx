@@ -7,11 +7,11 @@ import { RatingStars } from "@/components/ui/RatingStars";
 import { StatBar } from "@/components/ui/StatBar";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { StepNav } from "@/components/StepNav";
-import { MODULES } from "@/data/modules";
 import { CONTRACTORS } from "@/data/contractors";
 import { moduleIcons } from "@/lib/icons";
 import { formatCHF } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { useScaledModules } from "@/lib/useScaledModules";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { useToast } from "@/lib/toast";
 import { clsx } from "@/lib/clsx";
@@ -20,13 +20,14 @@ import type { Contractor, Module } from "@/data/types";
 export const ContractorSelection = () => {
   useDocumentTitle("Step 3 — Contractors");
   const { selectedModules, selectedContractors, selectContractor } = useStore();
+  const modules = useScaledModules();
   const toast = useToast();
-  const activeModules = MODULES.filter((m) => selectedModules.includes(m.id));
+  const activeModules = modules.filter((m) => selectedModules.includes(m.id));
   const [expanded, setExpanded] = useState<string | null>(activeModules[0]?.id ?? null);
 
   const handleSelect = (modId: Module["id"], contractor: Contractor) => {
     const wasChosen = selectedContractors[modId]?.name === contractor.name;
-    const mod = MODULES.find((m) => m.id === modId);
+    const mod = modules.find((m) => m.id === modId);
     selectContractor(modId, contractor);
     if (mod) {
       toast(
