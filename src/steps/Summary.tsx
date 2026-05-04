@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Calendar,
   ArrowLeft,
   ArrowRight,
   Printer,
@@ -9,6 +8,7 @@ import {
   AlertOctagon,
   ClipboardList,
   Check,
+  Phone,
   X,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -37,6 +37,8 @@ import type { ModuleId } from "@/data/types";
 
 const PROJECTION_YEARS = 15;
 
+type BookingMode = "order" | "callback";
+
 export const Summary = () => {
   useDocumentTitle("Step 7 — Summary");
   const {
@@ -51,8 +53,9 @@ export const Summary = () => {
   const modules = useScaledModules();
   const subsidies = useSubsidies();
   const [excluded, setExcluded] = useState<ModuleId | null>(null);
-  const [showBooking, setShowBooking] = useState(false);
+  const [bookingMode, setBookingMode] = useState<BookingMode | null>(null);
   const [bookedEmail, setBookedEmail] = useState<string | null>(null);
+  const [bookedMode, setBookedMode] = useState<BookingMode | null>(null);
 
   if (selectedModules.length === 0) {
     return (
@@ -383,38 +386,68 @@ export const Summary = () => {
         )}
       </Card>
 
-      {bookedEmail ? (
+      {bookedEmail && bookedMode ? (
         <Card className="mt-6 border-l-4 border-l-emerald bg-emerald/5 p-6 no-print">
           <div className="flex items-start gap-4">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald text-white">
               <Check size={18} strokeWidth={3} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-navy">
-                Audit booked — invitation sent to{" "}
-                <span className="text-emerald">{bookedEmail}</span>
-              </div>
-              <p className="mt-1 text-xs text-muted">
-                A certified GEAK auditor will arrive on{" "}
-                <strong className="text-navy">{formatLongDate(projectStart)}</strong>.
-                Demo complete — thanks for stepping through RenoSwiss.
-              </p>
+              {bookedMode === "order" ? (
+                <>
+                  <div className="text-sm font-semibold text-navy">
+                    Order placed — confirmation sent to{" "}
+                    <span className="text-emerald">{bookedEmail}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">
+                    Kickoff is set for{" "}
+                    <strong className="text-navy">{formatLongDate(projectStart)}</strong>.
+                    From here we orchestrate everything: contractor briefs go out,
+                    subsidy applications are filed, and the GEAK Plus audit is
+                    scheduled in the first phase. You'll get a single status email
+                    every Monday until handover.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="text-sm font-semibold text-navy">
+                    Callback scheduled — invite sent to{" "}
+                    <span className="text-emerald">{bookedEmail}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">
+                    A RenoSwiss advisor will call you on{" "}
+                    <strong className="text-navy">{formatLongDate(projectStart)}</strong>{" "}
+                    to walk through this plan, answer open questions and confirm
+                    the order whenever you're ready. No obligation until you say go.
+                  </p>
+                </>
+              )}
               <p className="mt-3 text-[11px] text-muted">
-                In a real product, the calendar invitation, contractor briefs and
-                subsidy applications would all dispatch from this confirmation.
+                Demo complete — thanks for stepping through RenoSwiss.
               </p>
             </div>
           </div>
         </Card>
       ) : (
         <Card className="mt-6 p-6 text-center no-print">
-          <Button size="lg" onClick={() => setShowBooking(true)}>
-            <Calendar size={16} />
-            Book your free GEAK Plus audit
-            <ArrowRight size={16} />
-          </Button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button size="lg" onClick={() => setBookingMode("order")}>
+              <Check size={16} strokeWidth={3} />
+              Place order — we orchestrate it
+              <ArrowRight size={16} />
+            </Button>
+            <Button
+              size="lg"
+              variant="secondary"
+              onClick={() => setBookingMode("callback")}
+            >
+              <Phone size={16} />
+              Request a consulting callback
+            </Button>
+          </div>
           <p className="mt-3 text-[11px] text-muted">
-            Certified auditor visits within 5 business days · No obligations
+            Place the order to lock in your kickoff, or talk it through with an
+            advisor first — both paths are free and non-binding.
           </p>
         </Card>
       )}
@@ -423,14 +456,16 @@ export const Summary = () => {
         <StepNav />
       </div>
 
-      {showBooking && (
+      {bookingMode && (
         <BookingModal
+          mode={bookingMode}
           initialDate={projectStart ?? ""}
-          onClose={() => setShowBooking(false)}
+          onClose={() => setBookingMode(null)}
           onConfirm={(date, email) => {
             setProjectStart(date);
             setBookedEmail(email);
-            setShowBooking(false);
+            setBookedMode(bookingMode);
+            setBookingMode(null);
           }}
         />
       )}
@@ -450,12 +485,45 @@ const formatLongDate = (iso: string | null) => {
 };
 
 interface BookingModalProps {
+  mode: BookingMode;
   initialDate: string;
   onClose: () => void;
   onConfirm: (date: string, email: string) => void;
 }
 
-const BookingModal = ({ initialDate, onClose, onConfirm }: BookingModalProps) => {
+const MODE_COPY: Record<
+  BookingMode,
+  {
+    eyebrow: string;
+    title: string;
+    subtitle: string;
+    submit: string;
+    weekendNote: string;
+    footnote: string;
+  }
+> = {
+  order: {
+    eyebrow: "Step 7 · Place order",
+    title: "Confirm your renovation kickoff.",
+    subtitle:
+      "Lock in the start date and we orchestrate the rest — contractor briefs, subsidy filings and the GEAK Plus audit all dispatch from this confirmation.",
+    submit: "Place order",
+    weekendNote: "Kickoff lands on weekdays — pick a working day.",
+    footnote: "Free · Cancel any time before the first contractor visit",
+  },
+  callback: {
+    eyebrow: "Step 7 · Consulting callback",
+    title: "Pick a slot for your advisor call.",
+    subtitle:
+      "A RenoSwiss advisor will walk through this plan with you, answer open questions and confirm the order whenever you're ready.",
+    submit: "Request callback",
+    weekendNote: "Advisors call on weekdays — pick a working day.",
+    footnote: "Free · 30-minute call · No obligation",
+  },
+};
+
+const BookingModal = ({ mode, initialDate, onClose, onConfirm }: BookingModalProps) => {
+  const copy = MODE_COPY[mode];
   const [date, setDate] = useState(initialDate);
   const [slot, setSlot] = useState<string>("09:00");
   const [email, setEmail] = useState("");
@@ -491,21 +559,20 @@ const BookingModal = ({ initialDate, onClose, onConfirm }: BookingModalProps) =>
 
         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-teal">
           <span className="h-1.5 w-1.5 rounded-full bg-teal" />
-          Step 7 · Book audit
+          {copy.eyebrow}
         </div>
         <h3
           id="booking-title"
           className="mt-3 font-serif text-[26px] font-bold leading-tight tracking-tight text-navy"
         >
-          Pick a date for your GEAK audit.
+          {copy.title}
         </h3>
         <p className="mt-2 text-[13px] leading-relaxed text-ink/70">
-          We'll send a calendar invitation with your auditor's details and the
-          on-site checklist.
+          {copy.subtitle}
         </p>
 
         <label className="mt-5 block text-[11px] font-semibold uppercase tracking-wider text-muted">
-          Audit date
+          {mode === "order" ? "Kickoff date" : "Callback date"}
         </label>
         <input
           type="date"
@@ -516,9 +583,7 @@ const BookingModal = ({ initialDate, onClose, onConfirm }: BookingModalProps) =>
           className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-navy outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/20"
         />
         {isWeekend && (
-          <p className="mt-1 text-[11px] text-warning">
-            Auditors don't visit on weekends — pick a weekday.
-          </p>
+          <p className="mt-1 text-[11px] text-warning">{copy.weekendNote}</p>
         )}
 
         <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-muted">
@@ -568,13 +633,13 @@ const BookingModal = ({ initialDate, onClose, onConfirm }: BookingModalProps) =>
             disabled={!valid}
             onClick={() => valid && onConfirm(date, email)}
           >
-            Send invitation
+            {copy.submit}
             <ArrowRight size={14} />
           </Button>
         </div>
 
         <p className="mt-4 text-center text-[11px] text-muted">
-          Free · 90-minute on-site assessment · No obligations
+          {copy.footnote}
         </p>
       </div>
     </div>

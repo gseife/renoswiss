@@ -44,6 +44,7 @@ const ELIG_RURAL_ZH: Eligibility = {
   canton: "ZH",
   bfsGemeindeNr: 9,
   currentHeatingFossil: false,
+  currentHeatingClean: false,
 };
 
 const STADT_ZH = (e: Eligibility): Eligibility => ({

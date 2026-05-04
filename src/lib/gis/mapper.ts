@@ -110,6 +110,10 @@ export interface Eligibility {
   /** True when the current primary heating burns oil/gas/coal —
    * gates the heating-replacement subsidy. */
   currentHeatingFossil: boolean;
+  /** True when the building is already on a clean heating system
+   * (heat pump, district heat, or thermal solar). Used to suppress the
+   * heating-replacement recommendation regardless of the renewal year. */
+  currentHeatingClean: boolean;
 }
 
 /** Sonnendach kWh→kWp factor for canton Zürich (BFE/MeteoSwiss 2024
@@ -241,6 +245,13 @@ export const mapToBuilding = (inputs: MapperInputs): MapperResult => {
 
   const zh = inputs.zhContext ?? null;
 
+  // GWR generator codes that count as "already clean" — replacing them
+  // with another heat pump isn't a sensible recommendation.
+  // 7410/7411 = Wärmepumpe, 7420 = Solaranlage, 7460 = Fernwärme.
+  const cleanGenCodes = new Set([7410, 7411, 7420, 7460]);
+  const currentHeatingClean =
+    gwr.gwaerzh1 != null && cleanGenCodes.has(gwr.gwaerzh1);
+
   const eligibility: Eligibility = {
     heatingRecentlyRenewed:
       heatingRenewedYear != null &&
@@ -260,6 +271,7 @@ export const mapToBuilding = (inputs: MapperInputs): MapperResult => {
     canton: gwr.gdekt,
     bfsGemeindeNr: gwr.ggdenr,
     currentHeatingFossil: fossil,
+    currentHeatingClean,
   };
 
   return { building, eligibility };

@@ -325,7 +325,7 @@ export const Timeline = () => {
       <SectionHeading
         eyebrow="Step 6"
         title="Project timeline"
-        description="Pick a kickoff date to see your phase-by-phase schedule. Tap any phase to see who's involved, what gets done and where you need to step in."
+        description="Pick a kickoff date to see your phase-by-phase schedule. Gold cards mark the moments you're personally needed — every other phase, we orchestrate end-to-end."
       />
 
       <Card className="mb-4 p-4">

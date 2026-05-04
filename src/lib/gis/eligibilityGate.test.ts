@@ -17,6 +17,7 @@ const NONE: Eligibility = {
   canton: "ZH",
   bfsGemeindeNr: 9,
   currentHeatingFossil: false,
+  currentHeatingClean: false,
 };
 
 describe("gateForModule", () => {
@@ -35,6 +36,26 @@ describe("gateForModule", () => {
       ...NONE,
       heatingRecentlyRenewed: true,
       heatingRenewedYear: 2023,
+    });
+    expect(g.skipped).toBe(true);
+    expect(g.reason).toContain("2023");
+  });
+
+  it("gates heating when the building already has a clean system", () => {
+    const g = gateForModule("heating", {
+      ...NONE,
+      currentHeatingClean: true,
+    });
+    expect(g.skipped).toBe(true);
+    expect(g.reason).toMatch(/Heat pump|district heat/i);
+  });
+
+  it("prefers the renewal-year reason when both clean-heating gates apply", () => {
+    const g = gateForModule("heating", {
+      ...NONE,
+      heatingRecentlyRenewed: true,
+      heatingRenewedYear: 2023,
+      currentHeatingClean: true,
     });
     expect(g.skipped).toBe(true);
     expect(g.reason).toContain("2023");

@@ -38,6 +38,7 @@ const ZH_BASE = {
   canton: "ZH",
   bfsGemeindeNr: 9,
   currentHeatingFossil: false,
+  currentHeatingClean: false,
 } as const;
 
 const RENOSWISS_GATED: Eligibility = {
@@ -63,18 +64,19 @@ const NO_GATES: Eligibility = {
 const STATIC = "STATIC FALLBACK";
 
 describe("reasonForModule", () => {
-  it("returns static when no live data ctx (eligibility null is fine)", () => {
-    const r = reasonForModule("facade", STATIC, {
-      building: ROSSMATTENWEG,
+  it("returns dynamic copy regardless of build cohort (no static fallback)", () => {
+    const old = reasonForModule("facade", STATIC, {
+      building: ROSSMATTENWEG, // 1924
       eligibility: null,
     });
-    // Building is 1924, so facade IS dynamic — use a 2020s building to test fallback.
-    const r2 = reasonForModule("facade", STATIC, {
+    const modern = reasonForModule("facade", STATIC, {
       building: { ...ROSSMATTENWEG, year: 2020 },
       eligibility: null,
     });
-    expect(r).not.toBe(STATIC);
-    expect(r2).toBe(STATIC);
+    expect(old).not.toBe(STATIC);
+    expect(old).toContain("1924");
+    expect(modern).not.toBe(STATIC);
+    expect(modern).toContain("2020");
   });
 
   it("facade copy interpolates the build year and current insulation", () => {
@@ -95,31 +97,32 @@ describe("reasonForModule", () => {
     expect(r).toContain("25 years");
   });
 
-  it("heating copy is null (gate takes over) when recently renewed", () => {
-    // We can't read null directly — reasonForModule always returns a string —
-    // but we verify the static fallback is used (which is what the gate path
-    // would replace anyway with its own chip).
+  it("heating copy mentions the renewal year when recently renewed", () => {
     const r = reasonForModule("heating", STATIC, {
       building: ROSSMATTENWEG,
       eligibility: RENOSWISS_GATED,
     });
-    expect(r).toBe(STATIC);
+    expect(r).not.toBe(STATIC);
+    expect(r).toContain("2023");
   });
 
-  it("heating copy is null when the system is already clean (HP)", () => {
+  it("heating copy reflects the existing clean system instead of recommending replacement", () => {
     const r = reasonForModule("heating", STATIC, {
-      building: ROSSMATTENWEG, // HP
+      building: ROSSMATTENWEG, // Wärmepumpe (2023)
       eligibility: NO_GATES,
     });
-    expect(r).toBe(STATIC);
+    expect(r).not.toBe(STATIC);
+    expect(r).toContain("Wärmepumpe");
+    expect(r).toContain("already in place");
   });
 
-  it("solar copy is null when PV already installed", () => {
+  it("solar copy reports the installed kWp instead of recommending fresh install", () => {
     const r = reasonForModule("solar", STATIC, {
       building: ROSSMATTENWEG,
-      eligibility: RENOSWISS_GATED,
+      eligibility: RENOSWISS_GATED, // 9.9 kWp installed
     });
-    expect(r).toBe(STATIC);
+    expect(r).not.toBe(STATIC);
+    expect(r).toContain("9.9 kWp");
   });
 
   it("solar copy mentions the heat-pump synergy when applicable", () => {
@@ -130,20 +133,32 @@ describe("reasonForModule", () => {
     expect(r).toContain("sonnendach");
   });
 
-  it("windows copy falls through for triple-glazed buildings", () => {
+  it("windows copy reflects already-triple-glazed without recommending replacement", () => {
     const r = reasonForModule("windows", STATIC, {
       building: { ...ROSSMATTENWEG, windows: "Dreifachverglasung Low-E" },
       eligibility: NO_GATES,
     });
-    expect(r).toBe(STATIC);
+    expect(r).not.toBe(STATIC);
+    expect(r).toContain("Dreifachverglasung");
+    expect(r).toMatch(/already|not cost-effective/i);
   });
 
-  it("basement copy falls through when already insulated", () => {
+  it("basement copy reflects already-insulated state", () => {
     const r = reasonForModule("basement", STATIC, {
       building: { ...ROSSMATTENWEG, basement: "Gedämmt" },
       eligibility: NO_GATES,
     });
-    expect(r).toBe(STATIC);
+    expect(r).not.toBe(STATIC);
+    expect(r).toMatch(/already insulated/i);
+  });
+
+  it("basement copy still recommends insulation when only partially insulated", () => {
+    const r = reasonForModule("basement", STATIC, {
+      building: { ...ROSSMATTENWEG, basement: "Teilweise gedämmt" },
+      eligibility: NO_GATES,
+    });
+    expect(r).toContain("Teilweise gedämmt");
+    expect(r).toMatch(/cheapest|pays back/i);
   });
 
   it("basement copy interpolates current condition otherwise", () => {

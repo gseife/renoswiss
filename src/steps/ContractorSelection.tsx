@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronDown, ShieldCheck, MapPin, Sparkles } from "lucide-react";
+import { Check, ChevronDown, ShieldCheck, MapPin, Sparkles, Tag } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -40,17 +40,23 @@ export const ContractorSelection = () => {
     }
   };
 
-  const pickAllRecommended = () => {
+  const pickAllByBadge = (badge: "Top Rated" | "Best Price") => {
     let count = 0;
     activeModules.forEach((mod) => {
       const list = CONTRACTORS[mod.id] ?? [];
-      const top = list.find((c) => c.badge === "Top Rated") ?? list[0];
-      if (top && selectedContractors[mod.id]?.name !== top.name) {
-        selectContractor(mod.id, top);
+      const pick = list.find((c) => c.badge === badge) ?? list[0];
+      if (pick && selectedContractors[mod.id]?.name !== pick.name) {
+        selectContractor(mod.id, pick);
         count++;
       }
     });
-    toast(count > 0 ? `Selected top-rated for ${count} module${count === 1 ? "" : "s"}` : "Top-rated already selected", "success");
+    const labelLc = badge.toLowerCase();
+    toast(
+      count > 0
+        ? `Selected ${labelLc} for ${count} module${count === 1 ? "" : "s"}`
+        : `${badge} already selected`,
+      "success",
+    );
   };
 
   if (activeModules.length === 0) {
@@ -76,10 +82,24 @@ export const ContractorSelection = () => {
         title="Choose your contractors"
         description="Ranked by verified data from completed projects in Kanton Zürich. One contractor per module."
         trailing={
-          <Button variant="secondary" size="sm" onClick={pickAllRecommended}>
-            <Sparkles size={14} />
-            Use top-rated
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => pickAllByBadge("Top Rated")}
+            >
+              <Sparkles size={14} />
+              Use top-rated
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => pickAllByBadge("Best Price")}
+            >
+              <Tag size={14} />
+              Use best price
+            </Button>
+          </div>
         }
       />
 

@@ -38,6 +38,7 @@ const ROSS_ELIG: Eligibility = {
   canton: "ZH",
   bfsGemeindeNr: 9,
   currentHeatingFossil: false,
+  currentHeatingClean: true,
 };
 
 describe("computeSubsidies — Rossmattenweg 1 (HP-already, PV-already, ZH rural)", () => {

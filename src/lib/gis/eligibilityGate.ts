@@ -32,6 +32,13 @@ export const gateForModule = (
     };
   }
 
+  if (id === "heating" && eligibility.currentHeatingClean) {
+    return {
+      skipped: true,
+      reason: "Heat pump / district heat already in place — replacement not needed",
+    };
+  }
+
   if (id === "solar" && eligibility.pvAlreadyInstalled) {
     const kw = eligibility.installedPvKw;
     return {

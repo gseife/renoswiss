@@ -51,6 +51,7 @@ const ZH_BASE = {
   canton: "ZH",
   bfsGemeindeNr: 9,
   currentHeatingFossil: false,
+  currentHeatingClean: false,
 } as const;
 
 const ROSS_ELIG: Eligibility = {
@@ -75,6 +76,7 @@ const NO_ELIG: Eligibility = {
 
 const facade = MODULES.find((m) => m.id === "facade")!;
 const heating = MODULES.find((m) => m.id === "heating")!;
+const windows = MODULES.find((m) => m.id === "windows")!;
 const solar = MODULES.find((m) => m.id === "solar")!;
 const electrical = MODULES.find((m) => m.id === "electrical")!;
 
@@ -129,6 +131,86 @@ describe("scaleModule", () => {
       eligibility: { ...NO_ELIG, roofPvPotentialKw: 15.8 },
     });
     expect(sc.desc).toContain("15.8 kWp");
+  });
+
+  it("heating desc uses live capacity and matches the existing fuel", () => {
+    const oilSfh = scaleModule(heating, {
+      building: DEMO_BUILDING,
+      eligibility: NO_ELIG,
+    });
+    // 185 m² × 0.045 → 8.3 kW (capped at min 8).
+    expect(oilSfh.desc).toContain("8.3 kW");
+    expect(oilSfh.desc).toContain("oil tank removal");
+
+    const gasMfh = scaleModule(heating, {
+      building: { ...ROSSMATTENWEG, heating: "Heizkessel (Gas)" },
+      eligibility: NO_ELIG,
+    });
+    // 523 m² × 0.045 → 23.5 kW.
+    expect(gasMfh.desc).toContain("23.5 kW");
+    expect(gasMfh.desc).toContain("gas connection capping");
+  });
+
+  it("windows desc scales the count from glazed area", () => {
+    const sfh = scaleModule(windows, {
+      building: DEMO_BUILDING,
+      eligibility: NO_ELIG,
+    });
+    // 185 × 0.16 / 2 → 15 windows (vs static 14×).
+    expect(sfh.desc).toMatch(/^15× triple-glazed/);
+
+    const mfh = scaleModule(windows, {
+      building: ROSSMATTENWEG,
+      eligibility: NO_ELIG,
+    });
+    // 523 × 0.16 / 2 → 42 windows.
+    expect(mfh.desc).toMatch(/^42× triple-glazed/);
+  });
+
+  it("facade desc surfaces the wall-area estimate", () => {
+    const sc = scaleModule(facade, {
+      building: DEMO_BUILDING,
+      eligibility: NO_ELIG,
+    });
+    // 185 m² SFH, 2 floors → footprint 92.5, perimeter 38, wall height 5.4,
+    // 38 × 5.4 × 0.7 ≈ 144 m² wall.
+    expect(sc.desc).toMatch(/m² wall area$/);
+    expect(sc.desc).toContain("ETICS");
+  });
+
+  it("roof desc surfaces the roof-surface estimate", () => {
+    const sc = scaleModule(MODULES.find((m) => m.id === "roof")!, {
+      building: ROSSMATTENWEG,
+      eligibility: NO_ELIG,
+    });
+    expect(sc.desc).toMatch(/m² roof surface$/);
+    expect(sc.desc).toContain("Aufsparrendämmung");
+  });
+
+  it("basement desc surfaces the ceiling-area estimate", () => {
+    const sc = scaleModule(MODULES.find((m) => m.id === "basement")!, {
+      building: DEMO_BUILDING,
+      eligibility: NO_ELIG,
+    });
+    expect(sc.desc).toMatch(/m² ceiling$/);
+    expect(sc.desc).toContain("Foam boards");
+  });
+
+  it("electrical desc drops the panel-upgrade clause when an HP is in place", () => {
+    const sc = scaleModule(electrical, {
+      building: ROSSMATTENWEG, // Wärmepumpe heating
+      eligibility: NO_ELIG,
+    });
+    expect(sc.desc).not.toContain("Panel upgrade");
+    expect(sc.desc).toContain("EV-charger");
+  });
+
+  it("electrical desc keeps the panel-upgrade clause for fossil heating", () => {
+    const sc = scaleModule(electrical, {
+      building: DEMO_BUILDING, // Heizöl
+      eligibility: NO_ELIG,
+    });
+    expect(sc.desc).toContain("Panel upgrade");
   });
 
   it("electrical cost stays flat (not area-scaled)", () => {

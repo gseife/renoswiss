@@ -26,19 +26,29 @@ const isClean = (heating: string): boolean =>
 
 const COPY: Partial<Record<ModuleId, CopyFn>> = {
   facade: ({ building }) => {
-    if (building.year > 2010) return null;
+    if (building.year > 2010) {
+      return `${building.year}-vintage facade with ${building.insulation}. Top-up insulation can lift a GEAK letter, but ROI is longer than for older stock.`;
+    }
     return `${building.year}-vintage facade. ${building.insulation} — typically the single largest heat-loss source for buildings of this cohort.`;
   },
 
   roof: ({ building }) => {
-    if (building.year > 2010) return null;
+    if (building.year > 2010) {
+      return `${building.roof} — already at current standard. Replacement only worthwhile as part of a wider envelope refresh.`;
+    }
     return `${building.roof}. Roof typically accounts for ~25% of heat loss in ${building.year}-era stock.`;
   },
 
   heating: ({ building, eligibility }) => {
-    // Gated cards render the gate reason instead — no copy needed.
-    if (eligibility?.heatingRecentlyRenewed) return null;
-    if (isClean(building.heating)) return null;
+    if (eligibility?.heatingRecentlyRenewed) {
+      const yr = eligibility.heatingRenewedYear;
+      return yr
+        ? `Heating renewed ${yr} — replacement not needed.`
+        : "Heating renewed recently — replacement not needed.";
+    }
+    if (isClean(building.heating)) {
+      return `${building.heating} already in place — no replacement needed.`;
+    }
     return `${building.heating} is ${building.heatingAge} years old (typical lifespan 20–25 years). Heat-pump replacement halves CO₂ and unlocks federal Gebäudeprogramm subsidies.`;
   },
 
@@ -47,27 +57,39 @@ const COPY: Partial<Record<ModuleId, CopyFn>> = {
       building.windows.includes("Dreifach") ||
       building.windows.includes("Triple")
     ) {
-      return null;
+      return `${building.windows} already in place — further glazing upgrade is not cost-effective.`;
     }
     return `${building.windows}. Triple-glazing upgrade cuts U-value 30–40% and removes thermal bridges at the frames.`;
   },
 
   solar: ({ eligibility }) => {
-    if (eligibility?.pvAlreadyInstalled) return null;
+    if (eligibility?.pvAlreadyInstalled) {
+      return `${eligibility.installedPvKw.toFixed(1)} kWp PV already installed — extension only if roof headroom remains.`;
+    }
     return `Federal sonnendach indicates suitable roof potential at this address. Pairs especially well with a heat pump or EV.`;
   },
 
   basement: ({ building }) => {
-    if (building.basement.includes("Gedämmt")) return null;
+    const fullyInsulated =
+      building.basement.includes("Gedämmt") &&
+      !building.basement.includes("Teilweise");
+    if (fullyInsulated) {
+      return `${building.basement} — basement ceiling already insulated; further work yields marginal savings.`;
+    }
     return `${building.basement}. Ceiling insulation is one of the cheapest CHF/kWh measures available — usually pays back in under 8 years.`;
   },
 
   electrical: ({ building, eligibility }) => {
-    // If the heating is already a HP, the panel is presumably sized.
-    if (isClean(building.heating) && !eligibility?.pvAlreadyInstalled) {
+    const hasHp = isClean(building.heating);
+    const hasPv = eligibility?.pvAlreadyInstalled ?? false;
+    if (hasHp && hasPv) {
+      const kw = eligibility!.installedPvKw.toFixed(1);
+      return `Heat pump and ${kw} kWp PV already in place — smart energy management ties them together.`;
+    }
+    if (hasHp) {
       return "Existing heat pump in place; recommend EV-charger prep + smart energy management.";
     }
-    return null;
+    return `${building.heating} likely needs a panel upgrade ahead of any heat-pump retrofit; smart controls optimise the new load.`;
   },
 };
 

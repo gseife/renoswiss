@@ -104,6 +104,18 @@ const NavBar = ({
           : "bg-transparent border-b border-transparent",
       )}
     >
+      <div className="bg-navy text-white">
+        <div className="mx-auto flex max-w-[1240px] items-center justify-center gap-2 px-6 py-1.5 text-[11px] font-medium tracking-wide text-white/85">
+          <span className="hidden h-1 w-1 rounded-full bg-mint sm:inline-block" />
+          <span>
+            From analysis to handover — we orchestrate every step.
+          </span>
+          <span className="hidden text-white/40 sm:inline">·</span>
+          <span className="hidden text-white/70 sm:inline">
+            Free analysis · Verified contractors · Subsidies handled
+          </span>
+        </div>
+      </div>
       <div className="mx-auto flex h-14 max-w-[1240px] items-center justify-between px-6">
         <Logo size="sm" />
         <nav className="hidden items-center gap-7 text-[13px] text-ink/80 md:flex">
@@ -1148,8 +1160,10 @@ const StartSection = ({
             Start with an address.
           </h2>
           <p className="mt-5 max-w-md text-[17px] leading-relaxed text-ink/75">
-            We pull from the GWR register, GEAK database and cantonal subsidy programs
-            — then return a complete renovation plan tailored to your home.
+            Type your address. We read your building from the federal GWR register
+            and GEAK energy database, match every cantonal and federal subsidy you
+            qualify for, and orchestrate the whole renovation — plan, contractors,
+            subsidies and financing — end-to-end.
           </p>
 
           <form

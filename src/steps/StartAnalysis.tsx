@@ -173,9 +173,10 @@ export const StartAnalysis = () => {
           <span className="text-teal">address.</span>
         </h1>
         <p className="mx-auto mt-5 max-w-md text-[15px] leading-relaxed text-ink/70 sm:text-[17px]">
-          We pull from the GWR register, GEAK database and cantonal subsidy
-          programs — then return a complete renovation plan tailored to your
-          home.
+          We read your building from the federal GWR register and GEAK energy
+          database, match every cantonal and federal subsidy you qualify for,
+          and orchestrate the whole renovation — plan, contractors, subsidies
+          and financing — end-to-end.
         </p>
 
         <form
