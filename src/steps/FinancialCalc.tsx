@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { Check, AlertTriangle, X, Sparkles, Printer, ArrowLeft, Wallet, PiggyBank } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/Card";
@@ -10,6 +10,8 @@ import { StepNav } from "@/components/StepNav";
 import { useScaledModules } from "@/lib/useScaledModules";
 import { useSubsidies } from "@/lib/useSubsidies";
 import { priceFor } from "@/lib/gis/contractorPricing";
+import { targetGeakFor } from "@/lib/gis/geakTarget";
+import { propertyValueUplift } from "@/lib/gis/valuation";
 import { BANKS, PRODUCTS, PRODUCT_ORDER, type Bank } from "@/data/banks";
 import { formatCHF } from "@/lib/format";
 import {
@@ -27,25 +29,10 @@ const STRESS_DELTAS = [-2, -1, 0, 1, 2, 3] as const;
 
 export const FinancialCalc = () => {
   useDocumentTitle("Step 5 — Calculator");
-  const { selectedModules, selectedContractors, finance, updateFinance, liveBuilding } =
+  const { selectedModules, selectedContractors, finance, updateFinance, building, eligibility } =
     useStore();
   const modules = useScaledModules();
   const subsidies = useSubsidies();
-
-  // When live building data lands (or changes), refresh the seeded
-  // property value & existing mortgage. We only sync once per liveBuilding
-  // identity so manual edits afterwards stick.
-  const syncedFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (!liveBuilding) return;
-    const key = `${liveBuilding.address}|${liveBuilding.estimatedValue}`;
-    if (syncedFor.current === key) return;
-    syncedFor.current = key;
-    updateFinance({
-      propertyValue: liveBuilding.estimatedValue,
-      existingMortgage: Math.round(liveBuilding.estimatedValue * 0.6),
-    });
-  }, [liveBuilding, updateFinance]);
 
   const totalCost = selectedModules.reduce((s, id) => {
     const mod = modules.find((m) => m.id === id);
@@ -67,8 +54,17 @@ export const FinancialCalc = () => {
   const equity = checkEquitySplit(cashOwn, pensionOwn);
 
   const renovationLoan = Math.max(0, renovationFundingNeed - totalOwn);
-  const totalMortgage = finance.existingMortgage + renovationLoan;
-  const propertyValueAfter = finance.propertyValue + Math.round(totalCost * 0.18);
+  // Cap the existing-mortgage input against the property value so a stale
+  // value from a prior (larger) address can't break LTV math.
+  const existingMortgage = Math.min(finance.existingMortgage, finance.propertyValue);
+  const totalMortgage = existingMortgage + renovationLoan;
+  // GEAK-driven uplift (Wüest/IAZI hedonic premium) — replaces the flat
+  // 18% of renovation spend with a defensible value-band shift, capped
+  // at +20% in valuation.ts.
+  const targetGeak = targetGeakFor(building.geakClass, selectedModules, eligibility);
+  const propertyValueAfter =
+    finance.propertyValue +
+    propertyValueUplift(finance.propertyValue, building.geakClass, targetGeak);
 
   const affordability = useMemo(
     () =>

@@ -45,6 +45,9 @@ export const StartAnalysis = () => {
   const [showList, setShowList] = useState(false);
   const [analyzing, setAnalyzing] = useState(initialAuto);
   const [step, setStep] = useState(0);
+  // `initialAuto` is the demo pathway from the landing page — no live
+  // analysis is dispatched, so the animation can complete on its own.
+  const [analysisDone, setAnalysisDone] = useState(initialAuto);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLFormElement>(null);
 
@@ -88,16 +91,19 @@ export const StartAnalysis = () => {
     return () => window.removeEventListener("mousedown", onClick);
   }, [showList]);
 
-  // Drive the analyze step animation + auto-navigate.
+  // Drive the analyze step animation. Stalls on the last step until the
+  // real analysis resolves so the building screen never paints with the
+  // demo fixture before live data has landed.
   useEffect(() => {
     if (!analyzing) return;
     if (step >= ANALYZE_STEPS.length) {
+      if (!analysisDone) return;
       const t = window.setTimeout(() => navigate("/building"), 350);
       return () => window.clearTimeout(t);
     }
     const t = window.setTimeout(() => setStep((s) => s + 1), STEP_DURATION);
     return () => window.clearTimeout(t);
-  }, [analyzing, step, navigate]);
+  }, [analyzing, step, analysisDone, navigate]);
 
   const pickSuggestion = (s: AddressSuggestion) => {
     setDraft(s.label);
@@ -146,8 +152,9 @@ export const StartAnalysis = () => {
     if (!value) return;
     setShowList(false);
     setStep(0);
+    setAnalysisDone(false);
     setAnalyzing(true);
-    void runAnalysis(value, chosen);
+    void runAnalysis(value, chosen).finally(() => setAnalysisDone(true));
   };
 
   if (analyzing) return <AnalyzingView step={step} />;

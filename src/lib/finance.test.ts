@@ -62,11 +62,6 @@ describe("calcFinance", () => {
     expect(r.paybackYears).toBe(Infinity);
   });
 
-  it("property uplift is 18% of total cost", () => {
-    const r = calcFinance(baseInputs);
-    expect(r.propertyIncrease).toBe(Math.round(baseInputs.totalCost * 0.18));
-  });
-
   it("handles zero financing (fully subsidized) gracefully", () => {
     const r = calcFinance({ ...baseInputs, netFinancing: 0 });
     expect(r.monthlyPayment).toBe(0);

@@ -25,16 +25,29 @@ import type {
   SolarRoofPotential,
 } from "./types";
 
-/** CHF/kWh price by fuel, 2026 retail estimates. */
+/** CHF/kWh price by fuel, Spring 2026 retail values for canton Zürich.
+ *
+ *  - electricity: ewz Pak 2 H4 + EKZ Standard residential blend (0.28).
+ *  - oil: Avenergy weekly HEL retail Q1-2026 (~CHF 115/100L → 0.115/kWh).
+ *  - gas: ewb / Erdgas Zürich H-Gas tariff Q1-2026 (0.105/kWh after the
+ *    post-2024 supply-crisis softening).
+ *  - district: ewz Wärmeverbund tariffs (network-renewable mix, premium).
+ *  - wood: pellet retail (CHF 480/t, 4.8 kWh/kg → 0.10/kWh).
+ *
+ * A real platform would refresh these monthly from BFS LIK + Avenergy +
+ * the Gemeinde's electric utility tariff sheet.
+ */
 const FUEL_PRICE_CHF_PER_KWH = {
-  electricity: 0.27,
-  oil: 0.105,
-  gas: 0.115,
-  district: 0.12,
-  wood: 0.08,
+  electricity: 0.28,
+  oil: 0.115,
+  gas: 0.105,
+  district: 0.13,
+  wood: 0.1,
 } as const;
 
-/** kg CO₂ per kWh delivered, useful-heat basis. */
+/** kg CO₂ per kWh delivered, useful-heat basis. Sources: BAFU Treibhaus-
+ * gasinventar (oil/gas/wood), KBOB Ökobilanzdaten (electricity Swiss mix
+ * 2024 ~40 g/kWh), district-heat factor weighted to ZH renewable mix. */
 const EMISSION_FACTOR_KG_PER_KWH = {
   electricity: 0.04,
   oil: 0.3,
@@ -44,7 +57,13 @@ const EMISSION_FACTOR_KG_PER_KWH = {
   hp: 0.04,
 } as const;
 
-const HP_COP = 3.5;
+/** Seasonal performance factor (JAZ) by GWR generator code. Air-water HPs
+ * sit around 3.0 in Swiss field studies (BFE/HSLU 2022); ground-source
+ * around 4.0 thanks to the stable source temperature. */
+const HP_COP_AIR = 3.0;
+const HP_COP_GROUND = 4.0;
+const hpCopFor = (gwaerzh1: number | null): number =>
+  gwaerzh1 === 7411 ? HP_COP_GROUND : HP_COP_AIR;
 
 export interface MappedAddress {
   /** Canonical "Strasse Nr, PLZ Ort" — built from GWR fields when the
@@ -93,8 +112,10 @@ export interface Eligibility {
   currentHeatingFossil: boolean;
 }
 
-/** Sonnendach kWh→kWp factor (Swiss average annual yield). */
-const PV_YIELD_KWH_PER_KWP = 1100;
+/** Sonnendach kWh→kWp factor for canton Zürich (BFE/MeteoSwiss 2024
+ * radiation atlas, ZH-mean). The sonnendach layer normally returns the
+ * real per-roof yield, so this fallback rarely fires. */
+const PV_YIELD_KWH_PER_KWP = 1050;
 
 export interface ZhContext {
   heritageBlock: boolean;
@@ -141,10 +162,15 @@ export const mapToBuilding = (inputs: MapperInputs): MapperResult => {
   const condition = deriveCondition({ year, heatingRenewedYear });
 
   // Useful heat from BFE per-building model when available, else cohort
-  // intensity × EBF (rough: 150 kWh/m²·a for unrenovated pre-1980, 90 for
-  // post-1995, 60 for post-2010).
-  const fallbackIntensity =
+  // intensity × EBF. Per-cohort SFH baseline below; multi-family stock has
+  // a better surface-to-volume ratio and runs ~25% lower for the same
+  // cohort (BFE Gebäudetypologie 2017, Table 4-2).
+  const sfhFallbackIntensity =
     year <= 1978 ? 150 : year <= 1994 ? 110 : year <= 2010 ? 90 : 60;
+  const isMfh = type.includes("Mehrfamilienhaus");
+  const fallbackIntensity = isMfh
+    ? Math.round(sfhFallbackIntensity * 0.75)
+    : sfhFallbackIntensity;
   const heatingDemand = solar?.heatingDemandKwh ?? Math.round(ebf * fallbackIntensity);
   const dhwDemand = solar?.dhwDemandKwh ?? Math.round(ebf * 22);
   const usefulHeatKwh = heatingDemand + dhwDemand;
@@ -152,7 +178,8 @@ export const mapToBuilding = (inputs: MapperInputs): MapperResult => {
   // Energy delivered + cost depend on the heating system.
   const electric = isElectricallyDriven(gwr);
   const fossil = isFossilHeating(gwr);
-  const annualEnergy = electric ? Math.round(usefulHeatKwh / HP_COP) : usefulHeatKwh;
+  const cop = hpCopFor(gwr.gwaerzh1);
+  const annualEnergy = electric ? Math.round(usefulHeatKwh / cop) : usefulHeatKwh;
   const fuelKey: keyof typeof FUEL_PRICE_CHF_PER_KWH = electric
     ? "electricity"
     : gwr.genh1 === 7513

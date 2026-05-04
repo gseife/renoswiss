@@ -162,7 +162,20 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         }),
       setAddress,
       setAddressMeta,
-      setLiveBuilding,
+      setLiveBuilding: (value) => {
+        setLiveBuilding(value);
+        // Re-seed finance defaults that key off property value as soon as
+        // live data lands, so Sidebar/Summary use the live valuation
+        // instead of the demo fixture's CHF 920k. Manual edits in the
+        // calculator stick because they overwrite this seed.
+        if (value) {
+          setFinance((prev) => ({
+            ...prev,
+            propertyValue: value.estimatedValue,
+            existingMortgage: Math.round(value.estimatedValue * 0.6),
+          }));
+        }
+      },
       setEligibility,
       updateFinance: (patch) => setFinance((prev) => ({ ...prev, ...patch })),
       setProjectStart,

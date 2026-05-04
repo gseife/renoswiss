@@ -42,21 +42,25 @@ export const gateForModule = (
     };
   }
 
-  if (id === "facade" && eligibility.heritageBlock) {
-    const obj = eligibility.heritageObject;
-    return {
-      skipped: true,
-      reason: obj
-        ? `Heritage object (${obj.objekt}) — façade insulation restricted`
-        : "Heritage-protected — façade insulation restricted",
-    };
-  }
-
-  if (id === "solar" && eligibility.heritageBlock) {
-    return {
-      skipped: true,
-      reason: "Heritage-protected — visible-roof PV typically restricted",
-    };
+  // Heritage rules currently only ground in canton ZH WFS data. Other
+  // cantons fall through (heritageBlock will always be false), but the
+  // explicit canton gate makes the intent visible at the call site.
+  if (eligibility.canton === "ZH" && eligibility.heritageBlock) {
+    if (id === "facade") {
+      const obj = eligibility.heritageObject;
+      return {
+        skipped: true,
+        reason: obj
+          ? `Heritage object (${obj.objekt}) — façade insulation restricted`
+          : "Heritage-protected — façade insulation restricted",
+      };
+    }
+    if (id === "solar") {
+      return {
+        skipped: true,
+        reason: "Heritage-protected — visible-roof PV typically restricted",
+      };
+    }
   }
 
   return NO_GATE;

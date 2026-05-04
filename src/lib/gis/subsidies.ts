@@ -16,17 +16,42 @@
 
 import type { Building, Module, ModuleId, Subsidy } from "@/data/types";
 import type { Eligibility } from "./mapper";
-import { basementM2, facadeM2, roofM2, windowsM2 } from "./buildingAreas";
+import { basementM2, facadeM2, heatingCapacityKw, roofM2, windowsM2 } from "./buildingAreas";
 
-/** Federal Gebäudeprogramm rate per module + scaling unit.
+/** Federal Gebäudeprogramm rate per envelope module + scaling unit.
  * `chfPerScalingUnit` × `scaleFor(module, building)` = federal CHF. */
-const FEDERAL_RATES: Partial<Record<ModuleId, { chfPerM2?: number; flatChf?: number }>> = {
+const FEDERAL_ENVELOPE_RATES: Partial<Record<ModuleId, { chfPerM2: number }>> = {
   facade: { chfPerM2: 30 }, // M-01: CHF 30/m² of insulated wall
   roof: { chfPerM2: 30 }, // M-02
   basement: { chfPerM2: 25 }, // M-03 (basement ceiling)
   windows: { chfPerM2: 70 }, // M-04 (only as part of full reno)
-  heating: { flatChf: 5000 }, // M-05/06: avg CHF 5k for HP swap
 };
+
+/** Kanton ZH Energieförderung 2026 envelope rates. Roughly federal × 1.5
+ * for facade/roof/basement under the GEAK-Plus path; windows stack only
+ * when the wall U-value also meets the cantonal target. The cantonal
+ * portion is added on top of the federal payout, not as a multiplier. */
+const KT_ZH_ENVELOPE_RATES: Partial<Record<ModuleId, { chfPerM2: number }>> = {
+  facade: { chfPerM2: 45 },
+  roof: { chfPerM2: 45 },
+  basement: { chfPerM2: 35 },
+  windows: { chfPerM2: 80 }, // only fires alongside facade/roof
+};
+
+/** Federal heat-pump bonus (HFM 2015 M-05/M-06). Two-part tariff:
+ * a base + per-kW bonus, with ground-source paying ~30% more. The
+ * generator code `gwaerzh1 = 7411` flags ground-source. */
+const HEATING_BASE_AIR_CHF = 3500;
+const HEATING_PER_KW_AIR_CHF = 250;
+const HEATING_BASE_GROUND_CHF = 5000;
+const HEATING_PER_KW_GROUND_CHF = 360;
+
+/** Kanton ZH heat-pump kicker on top of federal M-05/06. Air-water gets a
+ * flat CHF 4,000 + CHF 200/kW; ground-source CHF 5,500 + CHF 280/kW. */
+const KT_ZH_HEATING_BASE_AIR_CHF = 4000;
+const KT_ZH_HEATING_PER_KW_AIR_CHF = 200;
+const KT_ZH_HEATING_BASE_GROUND_CHF = 5500;
+const KT_ZH_HEATING_PER_KW_GROUND_CHF = 280;
 
 const scaleFor = (id: ModuleId, b: Building): number => {
   switch (id) {
@@ -43,12 +68,45 @@ const scaleFor = (id: ModuleId, b: Building): number => {
   }
 };
 
-const federalAmountFor = (id: ModuleId, b: Building): number => {
-  const r = FEDERAL_RATES[id];
+const federalEnvelopeAmountFor = (id: ModuleId, b: Building): number => {
+  const r = FEDERAL_ENVELOPE_RATES[id];
   if (!r) return 0;
-  if (r.flatChf) return r.flatChf;
-  if (r.chfPerM2) return Math.round(r.chfPerM2 * scaleFor(id, b));
-  return 0;
+  return Math.round(r.chfPerM2 * scaleFor(id, b));
+};
+
+/** Replacement HP type isn't selected by the user yet — assume the same
+ * generator the site is already plumbed for if it's a HP, otherwise air-
+ * water (the typical retrofit). Ground-source pays a meaningfully higher
+ * bonus, so getting this right matters for accuracy. */
+const federalHeatingAmountFor = (b: Building, e: Eligibility): number => {
+  const groundSource = e.geothermalZone != null; // ZH zone signals geothermal feasibility
+  const base = groundSource ? HEATING_BASE_GROUND_CHF : HEATING_BASE_AIR_CHF;
+  const perKw = groundSource ? HEATING_PER_KW_GROUND_CHF : HEATING_PER_KW_AIR_CHF;
+  return Math.round(base + perKw * heatingCapacityKw(b));
+};
+
+const ktZhEnvelopeAmountFor = (
+  id: ModuleId,
+  b: Building,
+  envelopeSelected: ModuleId[],
+): number => {
+  const r = KT_ZH_ENVELOPE_RATES[id];
+  if (!r) return 0;
+  // Windows only count toward the cantonal envelope subsidy when the
+  // wall is also being insulated (cantonal U-value gate).
+  if (id === "windows" && !envelopeSelected.includes("facade")) return 0;
+  return Math.round(r.chfPerM2 * scaleFor(id, b));
+};
+
+const ktZhHeatingAmountFor = (b: Building, e: Eligibility): number => {
+  const groundSource = e.geothermalZone != null;
+  const base = groundSource
+    ? KT_ZH_HEATING_BASE_GROUND_CHF
+    : KT_ZH_HEATING_BASE_AIR_CHF;
+  const perKw = groundSource
+    ? KT_ZH_HEATING_PER_KW_GROUND_CHF
+    : KT_ZH_HEATING_PER_KW_AIR_CHF;
+  return Math.round(base + perKw * heatingCapacityKw(b));
 };
 
 /** Pronovo Einmalvergütung (one-off) for new PV. */
@@ -81,7 +139,7 @@ export const computeSubsidies = (inputs: SubsidyInputs): Subsidy[] => {
   // ---- Federal Gebäudeprogramm ----
   let federal = 0;
   for (const id of envelopeSelected) {
-    federal += federalAmountFor(id, building);
+    federal += federalEnvelopeAmountFor(id, building);
   }
 
   // Heating subsidy fires only when actually swapping from fossil to clean.
@@ -89,7 +147,7 @@ export const computeSubsidies = (inputs: SubsidyInputs): Subsidy[] => {
     selectedModules.includes("heating") &&
     !eligibility.heatingRecentlyRenewed &&
     eligibility.currentHeatingFossil;
-  if (heatingSelected) federal += FEDERAL_RATES.heating?.flatChf ?? 0;
+  if (heatingSelected) federal += federalHeatingAmountFor(building, eligibility);
 
   if (federal > 0) {
     out.push({
@@ -102,16 +160,27 @@ export const computeSubsidies = (inputs: SubsidyInputs): Subsidy[] => {
   }
 
   // ---- Kanton ZH Energieförderung ----
-  // 50% top-up on federal envelope subsidies when GEAK-Plus path
-  // (≥3 envelope modules selected).
-  if (eligibility.canton === "ZH" && envelopeSelected.length >= 3) {
-    const cantonal = Math.round(federal * 0.5);
+  // Per-measure rates that stack on top of federal HFM 2015. The
+  // GEAK-Plus path (≥3 envelope modules) is required for the envelope
+  // bonus; the heat-pump kicker fires whenever the federal HP bonus
+  // does. Windows only count when the facade is also insulated.
+  if (eligibility.canton === "ZH") {
+    let cantonal = 0;
+    if (envelopeSelected.length >= 3) {
+      for (const id of envelopeSelected) {
+        cantonal += ktZhEnvelopeAmountFor(id, building, envelopeSelected);
+      }
+    }
+    if (heatingSelected) cantonal += ktZhHeatingAmountFor(building, eligibility);
     if (cantonal > 0) {
       out.push({
         source: "Kanton Zürich — Energieförderung",
         amount: cantonal,
         status: "Pre-qualified",
-        desc: "GEAK-Plus comprehensive renovation top-up",
+        desc:
+          envelopeSelected.length >= 3
+            ? "GEAK-Plus envelope rates + cantonal heat-pump kicker"
+            : "Cantonal heat-pump kicker (GEAK-Plus envelope path not met)",
         auto: true,
       });
     }
@@ -146,14 +215,20 @@ export const computeSubsidies = (inputs: SubsidyInputs): Subsidy[] => {
     }
   }
 
-  // ---- ProKilowatt (federal, optional) ----
-  // Lump-sum estimate — only applies for energy-management upgrades.
-  if (selectedModules.includes("electrical")) {
+  // ---- ewz Energiefonds (Stadt Zürich smart-energy bonus) ----
+  // ProKilowatt is competitive/commercial — not a residential subsidy.
+  // For Stadt Zürich, the actual instrument is the ewz Energiefonds
+  // Smart-Home/Energiemanagement bonus (CHF 500-1,000, by application).
+  if (
+    selectedModules.includes("electrical") &&
+    eligibility.canton === "ZH" &&
+    eligibility.bfsGemeindeNr === STADT_ZURICH_BFS
+  ) {
     out.push({
-      source: "ProKilowatt (Federal)",
-      amount: 1500,
+      source: "ewz Energiefonds (Stadt Zürich)",
+      amount: 800,
       status: "To verify",
-      desc: "Smart energy management efficiency credit",
+      desc: "Smart-home + energy-management installation bonus",
       auto: false,
     });
   }

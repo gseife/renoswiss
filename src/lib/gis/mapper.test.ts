@@ -148,12 +148,12 @@ describe("mapToBuilding (Rossmattenweg 1, 8932 Mettmenstetten)", () => {
       solar: ROSSMATTENWEG_SOLAR,
       now: new Date("2026-05-04"),
     });
-    // Useful heat = 77388 + 10368 = 87756. With HP COP 3.5 → ~25,073 kWh.
-    expect(building.annualEnergy).toBeGreaterThan(24500);
-    expect(building.annualEnergy).toBeLessThan(25500);
-    // Cost @ 0.27 CHF/kWh ≈ CHF 6,770.
-    expect(building.annualCost).toBeGreaterThan(6500);
-    expect(building.annualCost).toBeLessThan(7000);
+    // Useful heat = 77388 + 10368 = 87756. With air-water HP COP 3.0 → ~29,252 kWh.
+    expect(building.annualEnergy).toBeGreaterThan(28800);
+    expect(building.annualEnergy).toBeLessThan(29800);
+    // Cost @ 0.28 CHF/kWh ≈ CHF 8,200.
+    expect(building.annualCost).toBeGreaterThan(7900);
+    expect(building.annualCost).toBeLessThan(8400);
     // CO2 from electric HP: very low.
     expect(building.co2).toBeLessThan(1.5);
   });

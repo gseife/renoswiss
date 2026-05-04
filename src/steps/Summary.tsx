@@ -22,6 +22,7 @@ import { useStore } from "@/lib/store";
 import { useScaledModules } from "@/lib/useScaledModules";
 import { useSubsidies } from "@/lib/useSubsidies";
 import { priceFor } from "@/lib/gis/contractorPricing";
+import { heatingCapacityKw } from "@/lib/gis/buildingAreas";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   computeTotals,
@@ -45,6 +46,7 @@ export const Summary = () => {
     projectStart,
     setProjectStart,
     building,
+    eligibility,
   } = useStore();
   const modules = useScaledModules();
   const subsidies = useSubsidies();
@@ -83,7 +85,11 @@ export const Summary = () => {
   }
 
   const totals = computeTotals(selectedModules, selectedContractors, modules, subsidies);
-  const activeOffer = resolveActiveOffer(finance, totals);
+  const activeOffer = resolveActiveOffer(finance, totals, {
+    building,
+    selectedModules,
+    eligibility,
+  });
 
   // Scenario compare: same totals but with one module excluded
   const compareModules = excluded
@@ -98,11 +104,38 @@ export const Summary = () => {
 
   const trees = treesEquivalent(totals.annualCO2Saving);
 
-  // "Do nothing" baseline: 15 years of energy bills + boiler replacement +
-  // a conservative property-value erosion as energy standards tighten.
-  const energyOver15 = building.annualCost * PROJECTION_YEARS;
-  const boilerReplacement = 18_000; // typical oil/gas replacement cost
-  const valueErosion = Math.round(building.estimatedValue * 0.06); // ~6% drag on property value
+  // "Do nothing" baseline. Three components, each scaled to the
+  // building rather than flat:
+  //  1. Energy bills compounded at the BFS LIK fuel-price trend (~1.5%/yr)
+  //     over the projection window.
+  //  2. Forced boiler swap when the existing one ages out — sized to the
+  //     building's heat demand at CHF 1,400/kW + CHF 5,000 base (oil/gas
+  //     swap; HP-equivalent would actually cost more but isn't the
+  //     "do nothing" option).
+  //  3. Property-value erosion as MuKEn 2025 tightens — bigger drag on
+  //     low GEAK letters (G/F lose ~8%, D ~4%, A/B negligible).
+  const ENERGY_INFLATION = 0.015;
+  const compoundedEnergyCost = (annual: number, years: number): number => {
+    if (annual <= 0 || years <= 0) return 0;
+    if (Math.abs(ENERGY_INFLATION) < 1e-9) return annual * years;
+    const r = ENERGY_INFLATION;
+    return Math.round(annual * ((Math.pow(1 + r, years) - 1) / r));
+  };
+  const energyOver15 = compoundedEnergyCost(building.annualCost, PROJECTION_YEARS);
+  const boilerReplacement = Math.round(
+    5_000 + 1_400 * heatingCapacityKw(building),
+  );
+  const valueErosionPctByGeak: Record<string, number> = {
+    G: 0.09,
+    F: 0.07,
+    E: 0.05,
+    D: 0.04,
+    C: 0.02,
+    B: 0.01,
+    A: 0,
+  };
+  const valueErosionPct = valueErosionPctByGeak[building.geakClass] ?? 0.05;
+  const valueErosion = Math.round(building.estimatedValue * valueErosionPct);
   const doNothingCost = energyOver15 + boilerReplacement + valueErosion;
 
   const renoLoan = activeOffer?.renovationLoan ?? totals.netFinancing;
@@ -329,7 +362,7 @@ export const Summary = () => {
         </p>
         <ul className="space-y-2 text-sm">
           <BaselineRow
-            label={`Energy bills (${formatCHF(building.annualCost)}/yr × ${PROJECTION_YEARS} yrs)`}
+            label={`Energy bills (${formatCHF(building.annualCost)}/yr, +1.5%/yr × ${PROJECTION_YEARS} yrs)`}
             value={formatCHF(energyOver15)}
           />
           <BaselineRow label="Forced boiler replacement (lifespan exceeded)" value={formatCHF(boilerReplacement)} />

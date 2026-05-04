@@ -1,10 +1,13 @@
 import { MODULES } from "@/data/modules";
 import { SUBSIDIES } from "@/data/subsidies";
 import { BANKS } from "@/data/banks";
-import type { Contractor, Module, ModuleId, Subsidy } from "@/data/types";
+import type { Building, Contractor, Module, ModuleId, Subsidy } from "@/data/types";
 import type { FinanceState } from "./store";
+import type { Eligibility } from "./gis/mapper";
 import { calcAffordability, calcFinance, priceBankOffer } from "./finance";
 import { priceFor } from "./gis/contractorPricing";
+import { targetGeakFor } from "./gis/geakTarget";
+import { propertyValueUplift } from "./gis/valuation";
 
 export interface PlanTotals {
   totalCost: number;
@@ -102,6 +105,12 @@ export interface ActiveOffer {
   pensionOwnFunds: number;
 }
 
+export interface OfferContext {
+  building: Building;
+  selectedModules: ModuleId[];
+  eligibility: Eligibility | null;
+}
+
 /**
  * Resolves the user's selected (or auto-picked cheapest) bank offer using the
  * persisted finance inputs. Falls back to a generic estimate when no module
@@ -110,6 +119,7 @@ export interface ActiveOffer {
 export const resolveActiveOffer = (
   finance: FinanceState,
   totals: PlanTotals,
+  ctx?: OfferContext,
 ): ActiveOffer | null => {
   if (totals.netFinancing <= 0) return null;
 
@@ -120,8 +130,16 @@ export const resolveActiveOffer = (
   const renovationLoan = Math.max(0, totals.netFinancing - ownFundsCap);
   if (renovationLoan <= 0) return null;
 
-  const totalMortgage = finance.existingMortgage + renovationLoan;
-  const propertyValueAfter = finance.propertyValue + Math.round(totals.totalCost * 0.18);
+  const existingMortgage = Math.min(finance.existingMortgage, finance.propertyValue);
+  const totalMortgage = existingMortgage + renovationLoan;
+  const uplift = ctx
+    ? propertyValueUplift(
+        finance.propertyValue,
+        ctx.building.geakClass,
+        targetGeakFor(ctx.building.geakClass, ctx.selectedModules, ctx.eligibility),
+      )
+    : Math.round(totals.totalCost * 0.18);
+  const propertyValueAfter = finance.propertyValue + uplift;
   const affordability = calcAffordability({
     grossIncome: finance.grossIncome,
     propertyValueAfter,

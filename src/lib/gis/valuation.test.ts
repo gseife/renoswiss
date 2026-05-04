@@ -9,9 +9,9 @@ describe("estimatePropertyValue", () => {
       year: 1924,
       geak: "E",
     });
-    // 523 × 7400 × 0.85 × 0.96 ≈ 3.16M
-    expect(v).toBeGreaterThan(3_000_000);
-    expect(v).toBeLessThan(3_300_000);
+    // (523 / 1.18) × 7400 × 0.85 × 0.96 ≈ 2.68M
+    expect(v).toBeGreaterThan(2_500_000);
+    expect(v).toBeLessThan(2_800_000);
   });
 
   it("uses ZH default for unmapped Gemeinden", () => {
@@ -21,9 +21,9 @@ describe("estimatePropertyValue", () => {
       year: 2000,
       geak: "D",
     });
-    // 200 × 8500 × 1.05 × 1.0 = 1.785M
-    expect(v).toBeGreaterThan(1_700_000);
-    expect(v).toBeLessThan(1_900_000);
+    // (200 / 1.18) × 8500 × 1.05 × 1.0 ≈ 1.51M
+    expect(v).toBeGreaterThan(1_400_000);
+    expect(v).toBeLessThan(1_600_000);
   });
 
   it("uses non-ZH default for other cantons", () => {
@@ -33,9 +33,9 @@ describe("estimatePropertyValue", () => {
       year: 2000,
       geak: "D",
     });
-    // 200 × 6500 × 1.05 × 1.0 = 1.365M
-    expect(v).toBeGreaterThan(1_300_000);
-    expect(v).toBeLessThan(1_500_000);
+    // (200 / 1.18) × 6500 × 1.05 × 1.0 ≈ 1.156M
+    expect(v).toBeGreaterThan(1_080_000);
+    expect(v).toBeLessThan(1_240_000);
   });
 
   it("scales with Gemeinde — Goldküste premium over Knonaueramt", () => {

@@ -130,8 +130,8 @@ export const BuildingProfile = () => {
               tone="danger"
               label={
                 eligibility.heritageObject
-                  ? `Heritage: ${eligibility.heritageObject.objekt} — façade gated`
-                  : "Heritage-protected — façade gated"
+                  ? `Heritage: ${eligibility.heritageObject.objekt} — façade & roof PV gated`
+                  : "Heritage-protected — façade & roof PV gated"
               }
             />
           )}
@@ -165,6 +165,15 @@ export const BuildingProfile = () => {
               </p>
             </div>
           </div>
+        </Card>
+      )}
+
+      {addressMeta && !addressMeta.egid && (
+        <Card className="mt-4 border-l-4 border-l-warning bg-warning/5 p-4 text-[12px] leading-relaxed text-ink/80">
+          We could geocode your address but the federal building register
+          (GWR) didn't return a record at this point. Try a more specific
+          address (street name + house number) — the figures below fall
+          back to the demo fixture.
         </Card>
       )}
 
