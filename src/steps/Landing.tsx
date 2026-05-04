@@ -125,12 +125,6 @@ const NavBar = ({
           <button type="button" onClick={onHow} className="hover:text-navy">
             How it works
           </button>
-          <a href="#numbers" className="hover:text-navy">
-            Impact
-          </a>
-          <a href="#modules" className="hover:text-navy">
-            Modules
-          </a>
         </nav>
         <button
           onClick={onAnalyze}

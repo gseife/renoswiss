@@ -9,16 +9,38 @@ import {
   searchAddresses,
   type AddressSuggestion,
 } from "@/lib/gis/geoadmin";
-import { analyzeAddress } from "@/lib/gis/analyze";
+import { analyzeAddress, type AnalyzeProgress } from "@/lib/gis/analyze";
 import { gateForModule } from "@/lib/gis/eligibilityGate";
 
-const ANALYZE_STEPS = [
-  "Reading GWR building register",
-  "Querying GEAK energy database",
-  "Matching cantonal subsidy programs",
-  "Comparing renovation benchmarks",
+interface AnalyzeStepDef {
+  key: AnalyzeProgress;
+  label: string;
+  source: string;
+}
+
+const ANALYZE_STEPS: AnalyzeStepDef[] = [
+  {
+    key: "gwr",
+    label: "Building identity & footprint",
+    source: "Federal building register (GWR)",
+  },
+  {
+    key: "energy",
+    label: "Solar potential & existing PV",
+    source: "BFE Sonnendach · Pronovo HKN",
+  },
+  {
+    key: "cantonal",
+    label: "Heritage, Fernwärme, geothermal",
+    source: "Cantonal GIS (ZH pilot)",
+  },
+  {
+    key: "profile",
+    label: "Building profile & GEAK class",
+    source: "Cohort modelling · SIA 380/1",
+  },
 ];
-const STEP_DURATION = 420;
+const DEMO_STEP_DURATION = 480;
 const SEARCH_DEBOUNCE_MS = 220;
 
 type StartLocationState = { autoStart?: boolean } | null;
@@ -44,10 +66,12 @@ export const StartAnalysis = () => {
   const [chosen, setChosen] = useState<AddressSuggestion | null>(null);
   const [showList, setShowList] = useState(false);
   const [analyzing, setAnalyzing] = useState(initialAuto);
-  const [step, setStep] = useState(0);
+  const [completed, setCompleted] = useState<Set<AnalyzeProgress>>(new Set());
   // `initialAuto` is the demo pathway from the landing page — no live
-  // analysis is dispatched, so the animation can complete on its own.
-  const [analysisDone, setAnalysisDone] = useState(initialAuto);
+  // analysis is dispatched, so a sequential timer fakes the ticks.
+  // `analysisDone` flips true when either the demo timer or the real
+  // analyzeAddress promise has settled, gating navigation.
+  const [analysisDone, setAnalysisDone] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLFormElement>(null);
 
@@ -91,19 +115,38 @@ export const StartAnalysis = () => {
     return () => window.removeEventListener("mousedown", onClick);
   }, [showList]);
 
-  // Drive the analyze step animation. Stalls on the last step until the
-  // real analysis resolves so the building screen never paints with the
-  // demo fixture before live data has landed.
+  // Demo path (Musterstrasse autoStart from landing): no real backend is
+  // dispatched, so a timer ticks each step in turn just to give the user
+  // a credible loading sequence. Real submissions skip this entirely —
+  // the ticks come from analyzeAddress's onProgress callback.
   useEffect(() => {
-    if (!analyzing) return;
-    if (step >= ANALYZE_STEPS.length) {
-      if (!analysisDone) return;
-      const t = window.setTimeout(() => navigate("/building"), 350);
-      return () => window.clearTimeout(t);
-    }
-    const t = window.setTimeout(() => setStep((s) => s + 1), STEP_DURATION);
+    if (!analyzing || !initialAuto) return;
+    let i = 0;
+    const tick = () => {
+      if (i >= ANALYZE_STEPS.length) {
+        setAnalysisDone(true);
+        return;
+      }
+      setCompleted((prev) => {
+        const next = new Set(prev);
+        next.add(ANALYZE_STEPS[i]!.key);
+        return next;
+      });
+      i++;
+      timer = window.setTimeout(tick, DEMO_STEP_DURATION);
+    };
+    let timer = window.setTimeout(tick, DEMO_STEP_DURATION);
+    return () => window.clearTimeout(timer);
+  }, [analyzing, initialAuto]);
+
+  // Once the analysis has settled (timer in demo mode, real promise in
+  // live mode) we hand off to the building profile after a short beat
+  // so the final tick can render before navigation.
+  useEffect(() => {
+    if (!analyzing || !analysisDone) return;
+    const t = window.setTimeout(() => navigate("/building"), 450);
     return () => window.clearTimeout(t);
-  }, [analyzing, step, analysisDone, navigate]);
+  }, [analyzing, analysisDone, navigate]);
 
   const pickSuggestion = (s: AddressSuggestion) => {
     setDraft(s.label);
@@ -130,6 +173,13 @@ export const StartAnalysis = () => {
     setAddress(target.label);
     const result = await analyzeAddress(target.lv95, {
       addressLabel: target.label,
+      onProgress: (key) =>
+        setCompleted((prev) => {
+          if (prev.has(key)) return prev;
+          const next = new Set(prev);
+          next.add(key);
+          return next;
+        }),
     }).catch(() => null);
     setAddressMeta({ lv95: target.lv95, egid: result?.egid ?? null });
     setLiveBuilding(result?.building ?? null);
@@ -151,13 +201,20 @@ export const StartAnalysis = () => {
     const value = draft.trim();
     if (!value) return;
     setShowList(false);
-    setStep(0);
+    setCompleted(new Set());
     setAnalysisDone(false);
     setAnalyzing(true);
     void runAnalysis(value, chosen).finally(() => setAnalysisDone(true));
   };
 
-  if (analyzing) return <AnalyzingView step={step} />;
+  if (analyzing)
+    return (
+      <AnalyzingView
+        completed={completed}
+        analysisDone={analysisDone}
+        mocked={initialAuto}
+      />
+    );
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-gradient-to-b from-white via-surface to-canvas px-6 py-20">
@@ -238,61 +295,94 @@ export const StartAnalysis = () => {
   );
 };
 
-const AnalyzingView = ({ step }: { step: number }) => (
-  <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-white px-6">
-    <div className="w-full max-w-md text-center">
-      <Logo size="lg" />
-      <h2 className="mt-10 font-serif text-[28px] font-bold tracking-[-0.01em] text-navy">
-        Reading your building…
-      </h2>
-      <p className="mt-2 text-[14px] text-muted">
-        Cross-referencing official Swiss data sources.
-      </p>
+interface AnalyzingViewProps {
+  completed: Set<AnalyzeProgress>;
+  analysisDone: boolean;
+  /** True for the demo Musterstrasse path — the ticks are timer-mocked
+   * (no backend call), so we surface that to the user. */
+  mocked: boolean;
+}
 
-      <ol className="mt-10 space-y-2 text-left">
-        {ANALYZE_STEPS.map((label, i) => {
-          const done = i < step;
-          const current = i === step;
-          return (
-            <li
-              key={label}
-              className={clsx(
-                "flex items-center gap-3 rounded-xl border px-4 py-3 transition-all duration-300",
-                done && "border-emerald/30 bg-emerald/5",
-                current && "border-teal/30 bg-teal/5",
-                !done && !current && "border-line bg-white opacity-50",
-              )}
-            >
-              <span
+const AnalyzingView = ({ completed, analysisDone, mocked }: AnalyzingViewProps) => {
+  // The "current" step is the first one that hasn't ticked yet.
+  // Once analysisDone is true, anything still un-ticked is left as
+  // "skipped" (the source didn't apply or failed) rather than "current".
+  const currentIdx = ANALYZE_STEPS.findIndex((s) => !completed.has(s.key));
+
+  return (
+    <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-white px-6">
+      <div className="w-full max-w-md text-center">
+        <Logo size="lg" />
+        <h2 className="mt-10 font-serif text-[28px] font-bold tracking-[-0.01em] text-navy">
+          Reading your building…
+        </h2>
+        <p className="mt-2 text-[14px] text-muted">
+          {mocked
+            ? "Sample address — sources are simulated for the demo."
+            : "Each tick lands when the matching federal or cantonal source responds."}
+        </p>
+
+        <ol className="mt-10 space-y-2 text-left">
+          {ANALYZE_STEPS.map((step, i) => {
+            const done = completed.has(step.key);
+            const current = !done && i === currentIdx && !analysisDone;
+            const skipped = !done && analysisDone;
+            return (
+              <li
+                key={step.key}
                 className={clsx(
-                  "grid h-6 w-6 shrink-0 place-items-center rounded-full",
-                  done && "bg-emerald text-white",
-                  current && "bg-teal text-white",
-                  !done && !current && "bg-line text-muted",
+                  "flex items-start gap-3 rounded-xl border px-4 py-3 transition-all duration-300",
+                  done && "border-emerald/30 bg-emerald/5",
+                  current && "border-teal/30 bg-teal/5",
+                  skipped && "border-line bg-canvas/40 opacity-60",
+                  !done && !current && !skipped &&
+                    "border-line bg-white opacity-50",
                 )}
               >
-                {done ? (
-                  <Check size={12} strokeWidth={3} />
-                ) : current ? (
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
-                ) : (
-                  <span className="text-[10px] font-bold">{i + 1}</span>
-                )}
-              </span>
-              <span
-                className={clsx(
-                  "text-sm",
-                  done && "text-emerald",
-                  current && "font-semibold text-navy",
-                  !done && !current && "text-muted",
-                )}
-              >
-                {label}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+                <span
+                  className={clsx(
+                    "mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full",
+                    done && "bg-emerald text-white",
+                    current && "bg-teal text-white",
+                    !done && !current && "bg-line text-muted",
+                  )}
+                >
+                  {done ? (
+                    <Check size={12} strokeWidth={3} />
+                  ) : current ? (
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                  ) : skipped ? (
+                    <span className="text-[10px] font-bold">—</span>
+                  ) : (
+                    <span className="text-[10px] font-bold">{i + 1}</span>
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div
+                    className={clsx(
+                      "text-sm",
+                      done && "text-emerald",
+                      current && "font-semibold text-navy",
+                      !done && !current && "text-muted",
+                    )}
+                  >
+                    {step.label}
+                  </div>
+                  <div
+                    className={clsx(
+                      "mt-0.5 text-[11px]",
+                      done ? "text-emerald/70" : "text-muted",
+                    )}
+                  >
+                    {step.source}
+                    {skipped && " · skipped (source didn't apply)"}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
     </div>
-  </div>
-);
+  );
+};

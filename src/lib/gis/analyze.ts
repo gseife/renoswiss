@@ -27,32 +27,47 @@ export interface AnalyzeResult extends MapperResult {
   centroid: Lv95;
 }
 
+/** Coarse milestones the UI can tick as each real data source resolves.
+ * Tied to the actual federal/cantonal layers below, not to a wall-clock
+ * timer — a step appears unticked if its source failed or didn't apply. */
+export type AnalyzeProgress = "gwr" | "energy" | "cantonal" | "profile";
+
 export interface AnalyzeOptions {
   addressLabel?: string;
   signal?: AbortSignal;
+  /** Fired with a step key as each backing layer resolves. */
+  onProgress?: (step: AnalyzeProgress) => void;
 }
 
 export async function analyzeAddress(
   lv95: Lv95,
   options: AnalyzeOptions = {},
 ): Promise<AnalyzeResult | null> {
+  const { onProgress } = options;
   const identity = await identifyBuilding(lv95, options.signal);
   if (!identity) return null;
+  onProgress?.("gwr");
 
   const isZh = identity.attributes.gdekt === "ZH";
 
   // Use the GWR centroid for downstream layers — it's more reliable than
   // the geocoded address point when the building polygon is offset.
   // ZH layers fan out only when the parcel sits in canton Zürich.
-  const [solar, pv, zhContext] = await Promise.all([
-    identifySolar(identity.centroid, options.signal).catch(() => null),
-    identifyPvInstallations(identity.centroid, options.signal).catch(
-      () => [] as Awaited<ReturnType<typeof identifyPvInstallations>>,
-    ),
-    isZh
-      ? buildZhContext(identity.centroid, options.signal)
-      : Promise.resolve<ZhContext | null>(null),
-  ]);
+  const solarP = identifySolar(identity.centroid, options.signal).catch(
+    () => null,
+  );
+  const pvP = identifyPvInstallations(identity.centroid, options.signal).catch(
+    () => [] as Awaited<ReturnType<typeof identifyPvInstallations>>,
+  );
+  // Tick "energy" only when both Sonnendach + Pronovo have settled.
+  void Promise.all([solarP, pvP]).then(() => onProgress?.("energy"));
+
+  const zhP: Promise<ZhContext | null> = isZh
+    ? buildZhContext(identity.centroid, options.signal)
+    : Promise.resolve(null);
+  void zhP.then(() => onProgress?.("cantonal"));
+
+  const [solar, pv, zhContext] = await Promise.all([solarP, pvP, zhP]);
 
   const mapped = mapToBuilding({
     gwr: identity.attributes,
@@ -61,6 +76,7 @@ export async function analyzeAddress(
     pvInstallations: pv,
     zhContext,
   });
+  onProgress?.("profile");
 
   return {
     ...mapped,
