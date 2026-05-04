@@ -17,8 +17,10 @@ import {
   estimateEbfM2,
   geakFromIntensity,
 } from "./condition";
+import { estimatePropertyValue } from "./valuation";
 import type {
   GwrAttributes,
+  HeritageObject,
   PvInstallation,
   SolarRoofPotential,
 } from "./types";
@@ -69,10 +71,38 @@ export interface Eligibility {
   /** Roof PV potential in kWp from sonnendach (full installable size,
    * not "headroom" — subtract installedPvKw to get extension headroom). */
   roofPvPotentialKw: number | null;
+  /** True when a cantonal heritage object sits within ~25m of the
+   * parcel — façade insulation and roof-mounted PV are typically
+   * restricted on listed buildings. */
+  heritageBlock: boolean;
+  /** Closest heritage object within 200m, if any. */
+  heritageObject: HeritageObject | null;
+  /** Distance in metres to that object. */
+  heritageDistanceM: number | null;
+  /** District heat suitability area intersects the parcel. */
+  districtHeatAvailable: boolean;
+  /** Geothermal-use zone code from the cantonal Wärmenutzungsatlas
+   * (A=zulässig, B–D=mit Auflagen, null=outside the published zones). */
+  geothermalZone: string | null;
+  /** Canton code from GWR — drives cantonal subsidy programs. */
+  canton: string;
+  /** BFS Gemeindenummer — drives communal top-ups. */
+  bfsGemeindeNr: number;
+  /** True when the current primary heating burns oil/gas/coal —
+   * gates the heating-replacement subsidy. */
+  currentHeatingFossil: boolean;
 }
 
 /** Sonnendach kWh→kWp factor (Swiss average annual yield). */
 const PV_YIELD_KWH_PER_KWP = 1100;
+
+export interface ZhContext {
+  heritageBlock: boolean;
+  heritageObject: HeritageObject | null;
+  heritageDistanceM: number | null;
+  districtHeatAvailable: boolean;
+  geothermalZone: string | null;
+}
 
 export interface MapperInputs {
   gwr: GwrAttributes;
@@ -80,6 +110,9 @@ export interface MapperInputs {
   addressLabel?: string;
   solar?: SolarRoofPotential | null;
   pvInstallations?: PvInstallation[];
+  /** Cantonal context (heritage / district heat / geothermal). Optional —
+   * cantons outside ZH leave this null. */
+  zhContext?: ZhContext | null;
   /** "Today" — injectable for deterministic tests. */
   now?: Date;
   /** Window for "recently renewed" eligibility checks. */
@@ -143,24 +176,12 @@ export const mapToBuilding = (inputs: MapperInputs): MapperResult => {
   const intensityForGeak = usefulHeatKwh / Math.max(ebf, 1);
   const geakClass = geakFromIntensity(intensityForGeak);
 
-  // Property value: keep a rough mock for now (Step 5 replaces with BFS hedonic).
-  // CHF/m² placeholder — varies by canton in real data.
-  const pricePerM2 = gwr.gdekt === "ZH" ? 6500 : 5500;
-  const yearFactor =
-    year <= 1948 ? 0.85 : year <= 1978 ? 0.92 : year <= 1994 ? 1.0 : year <= 2010 ? 1.05 : 1.12;
-  const conditionFactor =
-    geakClass === "A" || geakClass === "B"
-      ? 1.1
-      : geakClass === "C"
-        ? 1.05
-        : geakClass === "D"
-          ? 1.0
-          : geakClass === "E"
-            ? 0.96
-            : geakClass === "F"
-              ? 0.92
-              : 0.88;
-  const estimatedValue = Math.round(ebf * pricePerM2 * yearFactor * conditionFactor);
+  const estimatedValue = estimatePropertyValue({
+    gwr,
+    ebfM2: ebf,
+    year,
+    geak: geakClass,
+  });
 
   const building: Building = {
     address: inputs.addressLabel ?? fallbackAddressFromGwr(gwr),
@@ -191,6 +212,8 @@ export const mapToBuilding = (inputs: MapperInputs): MapperResult => {
       ? Math.round((solar.pvYieldKwh / PV_YIELD_KWH_PER_KWP) * 10) / 10
       : null;
 
+  const zh = inputs.zhContext ?? null;
+
   const eligibility: Eligibility = {
     heatingRecentlyRenewed:
       heatingRenewedYear != null &&
@@ -202,6 +225,14 @@ export const mapToBuilding = (inputs: MapperInputs): MapperResult => {
     installedPvKw: Math.round(installedPvKw * 10) / 10,
     heatingRenewedYear,
     roofPvPotentialKw,
+    heritageBlock: zh?.heritageBlock ?? false,
+    heritageObject: zh?.heritageObject ?? null,
+    heritageDistanceM: zh?.heritageDistanceM ?? null,
+    districtHeatAvailable: zh?.districtHeatAvailable ?? false,
+    geothermalZone: zh?.geothermalZone ?? null,
+    canton: gwr.gdekt,
+    bfsGemeindeNr: gwr.ggdenr,
+    currentHeatingFossil: fossil,
   };
 
   return { building, eligibility };

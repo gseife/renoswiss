@@ -42,5 +42,22 @@ export const gateForModule = (
     };
   }
 
+  if (id === "facade" && eligibility.heritageBlock) {
+    const obj = eligibility.heritageObject;
+    return {
+      skipped: true,
+      reason: obj
+        ? `Heritage object (${obj.objekt}) — façade insulation restricted`
+        : "Heritage-protected — façade insulation restricted",
+    };
+  }
+
+  if (id === "solar" && eligibility.heritageBlock) {
+    return {
+      skipped: true,
+      reason: "Heritage-protected — visible-roof PV typically restricted",
+    };
+  }
+
   return NO_GATE;
 };

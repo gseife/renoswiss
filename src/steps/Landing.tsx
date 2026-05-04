@@ -12,6 +12,7 @@ import {
 import { Logo } from "@/components/Logo";
 import { useStore } from "@/lib/store";
 import { useScaledModules } from "@/lib/useScaledModules";
+import { useSubsidies } from "@/lib/useSubsidies";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { computeTotals } from "@/lib/derived";
 import { clsx } from "@/lib/clsx";
@@ -1675,7 +1676,8 @@ const ResumePill = ({
 }) => {
   const { selectedModules, selectedContractors } = useStore();
   const modules = useScaledModules();
-  const totals = computeTotals(selectedModules, selectedContractors, modules);
+  const subsidies = useSubsidies();
+  const totals = computeTotals(selectedModules, selectedContractors, modules, subsidies);
   return (
     <div className="fixed bottom-5 right-5 z-50 flex max-w-[340px] items-center gap-3 rounded-2xl border border-line bg-white/90 p-3 pl-4 shadow-card backdrop-blur-xl">
       <div className="min-w-0">

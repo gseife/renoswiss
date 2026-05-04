@@ -20,6 +20,8 @@ import { moduleIcons } from "@/lib/icons";
 import { formatCHF, formatNumber } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { useScaledModules } from "@/lib/useScaledModules";
+import { useSubsidies } from "@/lib/useSubsidies";
+import { priceFor } from "@/lib/gis/contractorPricing";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   computeTotals,
@@ -45,6 +47,7 @@ export const Summary = () => {
     building,
   } = useStore();
   const modules = useScaledModules();
+  const subsidies = useSubsidies();
   const [excluded, setExcluded] = useState<ModuleId | null>(null);
   const [showBooking, setShowBooking] = useState(false);
   const [bookedEmail, setBookedEmail] = useState<string | null>(null);
@@ -79,14 +82,19 @@ export const Summary = () => {
     );
   }
 
-  const totals = computeTotals(selectedModules, selectedContractors, modules);
+  const totals = computeTotals(selectedModules, selectedContractors, modules, subsidies);
   const activeOffer = resolveActiveOffer(finance, totals);
 
   // Scenario compare: same totals but with one module excluded
   const compareModules = excluded
     ? selectedModules.filter((id) => id !== excluded)
     : selectedModules;
-  const compareTotals = computeTotals(compareModules, selectedContractors, modules);
+  const compareTotals = computeTotals(
+    compareModules,
+    selectedContractors,
+    modules,
+    subsidies,
+  );
 
   const trees = treesEquivalent(totals.annualCO2Saving);
 
@@ -200,7 +208,7 @@ export const Summary = () => {
                 </div>
               </div>
               <div className={clsx("text-sm font-bold", isExcluded ? "text-muted line-through" : "text-navy")}>
-                {formatCHF(ct ? ct.price : mod.estCost)}
+                {formatCHF(ct ? priceFor(ct, mod) : mod.estCost)}
               </div>
             </Card>
           );

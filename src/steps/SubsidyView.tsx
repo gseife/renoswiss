@@ -4,9 +4,9 @@ import { Stat } from "@/components/ui/Stat";
 import { Badge } from "@/components/ui/Badge";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { StepNav } from "@/components/StepNav";
-import { SUBSIDIES } from "@/data/subsidies";
 import { formatCHF } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useSubsidies } from "@/lib/useSubsidies";
 
 const statusTone = {
   "Pre-qualified": "emerald",
@@ -16,8 +16,9 @@ const statusTone = {
 
 export const SubsidyView = () => {
   useDocumentTitle("Step 4 — Subsidies");
-  const total = SUBSIDIES.reduce((s, sub) => s + sub.amount, 0);
-  const filed = SUBSIDIES.filter((s) => s.auto).length;
+  const subsidies = useSubsidies();
+  const total = subsidies.reduce((s, sub) => s + sub.amount, 0);
+  const filed = subsidies.filter((s) => s.auto).length;
 
   return (
     <>
@@ -28,7 +29,7 @@ export const SubsidyView = () => {
       />
 
       <div className="space-y-2">
-        {SUBSIDIES.map((sub) => (
+        {subsidies.map((sub) => (
           <Card
             key={sub.source}
             className={`p-4 ${sub.auto ? "border-l-4 border-l-emerald" : "border-l-4 border-l-gold"}`}
@@ -57,7 +58,7 @@ export const SubsidyView = () => {
         <div className="bg-gradient-to-br from-navy to-teal px-6 py-5 text-white">
           <div className="grid grid-cols-3 gap-2">
             <Stat value={formatCHF(total)} label="Total identified" tone="white" />
-            <Stat value={`${filed} of ${SUBSIDIES.length}`} label="Auto-filed" tone="mint" />
+            <Stat value={`${filed} of ${subsidies.length}`} label="Auto-filed" tone="mint" />
             <Stat value="~40%" label="More than avg." tone="gold" />
           </div>
         </div>
@@ -69,7 +70,7 @@ export const SubsidyView = () => {
           <p className="text-xs leading-relaxed text-ink/80">
             <strong className="text-navy">Important:</strong> Most cantonal programs require
             applications before construction begins. Missing this deadline means forfeiting the
-            subsidy. RenoSwiss files {filed} of {SUBSIDIES.length} applications automatically —
+            subsidy. RenoSwiss files {filed} of {subsidies.length} applications automatically —
             ensuring no money is left on the table.
           </p>
         </div>

@@ -1,13 +1,15 @@
 import { Activity, TrendingDown, TrendingUp, Wallet, Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useScaledModules } from "@/lib/useScaledModules";
+import { useSubsidies } from "@/lib/useSubsidies";
 import { computeTotals } from "@/lib/derived";
 import { formatCHF } from "@/lib/format";
 
 export const SidebarDashboard = () => {
   const { selectedModules, selectedContractors } = useStore();
   const modules = useScaledModules();
-  const t = computeTotals(selectedModules, selectedContractors, modules);
+  const subsidies = useSubsidies();
+  const t = computeTotals(selectedModules, selectedContractors, modules, subsidies);
 
   const fillPct = t.modulesTotal > 0 ? (t.modulesSelected / t.modulesTotal) * 100 : 0;
 

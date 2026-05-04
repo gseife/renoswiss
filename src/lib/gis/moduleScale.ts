@@ -10,6 +10,7 @@
 
 import type { Building, Module, ModuleId } from "@/data/types";
 import type { Eligibility } from "./mapper";
+import { marketCostFor } from "./marketCost";
 
 /** Calibration baseline (matches src/data/building.ts). */
 const BASE_AREA_M2 = 185;
@@ -70,7 +71,6 @@ const solarDescFor = (kwp: number): string => {
 
 export const scaleModule = (m: Module, ctx: ScaleContext): Module => {
   const { building, eligibility } = ctx;
-  const cs = costScale(m.id, building, eligibility);
   const ss = savingScale(m.id, building, eligibility);
 
   const desc =
@@ -78,10 +78,17 @@ export const scaleModule = (m: Module, ctx: ScaleContext): Module => {
       ? solarDescFor(solarHeadroomKw(eligibility))
       : m.desc;
 
+  // ZH path: anchor cost in real CHF/m² × physical scaling unit.
+  // Falls through to the generic area-power formula for other cantons.
+  const market = marketCostFor(m.id, building, eligibility);
+  const estCost = market
+    ? market.cost
+    : Math.round(m.estCost * costScale(m.id, building, eligibility));
+
   return {
     ...m,
     desc,
-    estCost: Math.round(m.estCost * cs),
+    estCost,
     energySaving: Math.round(m.energySaving * ss),
     co2Saving: Math.round(m.co2Saving * ss * 10) / 10,
   };

@@ -9,7 +9,17 @@ import {
   identifyPvInstallations,
   identifySolar,
 } from "./geoadmin";
-import { mapToBuilding, type Eligibility, type MapperResult } from "./mapper";
+import {
+  identifyDistrictHeatAvailable,
+  identifyGeothermalZone,
+  identifyHeritage,
+} from "./gisZh";
+import {
+  mapToBuilding,
+  type Eligibility,
+  type MapperResult,
+  type ZhContext,
+} from "./mapper";
 import type { Lv95 } from "./types";
 
 export interface AnalyzeResult extends MapperResult {
@@ -29,13 +39,19 @@ export async function analyzeAddress(
   const identity = await identifyBuilding(lv95, options.signal);
   if (!identity) return null;
 
+  const isZh = identity.attributes.gdekt === "ZH";
+
   // Use the GWR centroid for downstream layers — it's more reliable than
   // the geocoded address point when the building polygon is offset.
-  const [solar, pv] = await Promise.all([
+  // ZH layers fan out only when the parcel sits in canton Zürich.
+  const [solar, pv, zhContext] = await Promise.all([
     identifySolar(identity.centroid, options.signal).catch(() => null),
     identifyPvInstallations(identity.centroid, options.signal).catch(
       () => [] as Awaited<ReturnType<typeof identifyPvInstallations>>,
     ),
+    isZh
+      ? buildZhContext(identity.centroid, options.signal)
+      : Promise.resolve<ZhContext | null>(null),
   ]);
 
   const mapped = mapToBuilding({
@@ -43,6 +59,7 @@ export async function analyzeAddress(
     addressLabel: options.addressLabel,
     solar,
     pvInstallations: pv,
+    zhContext,
   });
 
   return {
@@ -51,5 +68,28 @@ export async function analyzeAddress(
     centroid: identity.centroid,
   };
 }
+
+const buildZhContext = async (
+  lv95: Lv95,
+  signal?: AbortSignal,
+): Promise<ZhContext> => {
+  const [heritage, districtHeat, geothermal] = await Promise.all([
+    identifyHeritage(lv95, { signal }).catch(() => ({
+      nearest: null,
+      distanceM: null,
+      blocksFacade: false,
+    })),
+    identifyDistrictHeatAvailable(lv95, signal).catch(() => false),
+    identifyGeothermalZone(lv95, signal).catch(() => null),
+  ]);
+
+  return {
+    heritageBlock: heritage.blocksFacade,
+    heritageObject: heritage.nearest,
+    heritageDistanceM: heritage.distanceM,
+    districtHeatAvailable: districtHeat,
+    geothermalZone: geothermal,
+  };
+};
 
 export type { Eligibility };

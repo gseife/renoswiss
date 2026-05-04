@@ -105,3 +105,18 @@ export interface PvInstallation {
   address: string;
   canton: string;
 }
+
+/** A heritage object near (or at) the parcel, from GIS-ZH
+ * `ogd-0368_giszhpub_arv_kaz_denkmalschutzobjekte_p`. */
+export interface HeritageObject {
+  /** Stable internal ID. */
+  id: number;
+  /** Human-readable description ("Pfarrhaus", "Bauernhaus" …). */
+  objekt: string;
+  /** Address as published in the inventory. */
+  strasse: string;
+  /** Cantonal vs regional importance — stub field, filled when present. */
+  ensemble: string | null;
+  /** Source PDF inventory sheet, when published. */
+  inventarblatt: string | null;
+}

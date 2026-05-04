@@ -42,6 +42,17 @@ const ROSSMATTENWEG: Building = {
   estimatedValue: 3_120_000,
 };
 
+const ZH_BASE = {
+  heritageBlock: false,
+  heritageObject: null,
+  heritageDistanceM: null,
+  districtHeatAvailable: false,
+  geothermalZone: null,
+  canton: "ZH",
+  bfsGemeindeNr: 9,
+  currentHeatingFossil: false,
+} as const;
+
 const ROSS_ELIG: Eligibility = {
   heatingRecentlyRenewed: true,
   dhwRecentlyRenewed: true,
@@ -49,6 +60,7 @@ const ROSS_ELIG: Eligibility = {
   installedPvKw: 9.9,
   heatingRenewedYear: 2023,
   roofPvPotentialKw: 15.8,
+  ...ZH_BASE,
 };
 
 const NO_ELIG: Eligibility = {
@@ -58,6 +70,7 @@ const NO_ELIG: Eligibility = {
   installedPvKw: 0,
   heatingRenewedYear: null,
   roofPvPotentialKw: null,
+  ...ZH_BASE,
 };
 
 const facade = MODULES.find((m) => m.id === "facade")!;
@@ -66,13 +79,15 @@ const solar = MODULES.find((m) => m.id === "solar")!;
 const electrical = MODULES.find((m) => m.id === "electrical")!;
 
 describe("scaleModule", () => {
-  it("is identity-ish for the demo building (calibration baseline)", () => {
+  it("uses market-anchored cost for ZH demo building", () => {
     const sc = scaleModule(facade, {
       building: DEMO_BUILDING,
       eligibility: NO_ELIG,
     });
-    expect(sc.estCost).toBeGreaterThanOrEqual(facade.estCost - 100);
-    expect(sc.estCost).toBeLessThanOrEqual(facade.estCost + 100);
+    // 185 m² SFH → ~145 m² wall × CHF 320 ≈ CHF 46k (vs static demo CHF 48k).
+    // Both within typical ETICS market range for an SFH facade.
+    expect(sc.estCost).toBeGreaterThan(40_000);
+    expect(sc.estCost).toBeLessThan(55_000);
     expect(sc.energySaving).toBeGreaterThanOrEqual(facade.energySaving - 50);
   });
 
@@ -101,9 +116,9 @@ describe("scaleModule", () => {
       building: ROSSMATTENWEG,
       eligibility: ROSS_ELIG, // 15.8 potential − 9.9 installed = 5.9 kWp
     });
-    // base 8.4 kWp / CHF 26k → 5.9 kWp scales to ~CHF 18k.
-    expect(sc.estCost).toBeGreaterThan(15000);
-    expect(sc.estCost).toBeLessThan(22000);
+    // 5.9 kWp at ZH tier rate CHF 2,000/kWp ≈ CHF 11,800.
+    expect(sc.estCost).toBeGreaterThan(10_000);
+    expect(sc.estCost).toBeLessThan(14_000);
     expect(sc.desc).toContain("5.9 kWp");
     expect(sc.desc).toContain("panels");
   });

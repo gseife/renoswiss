@@ -12,6 +12,7 @@ import { moduleIcons } from "@/lib/icons";
 import { formatCHF } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { useScaledModules } from "@/lib/useScaledModules";
+import { priceFor } from "@/lib/gis/contractorPricing";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { useToast } from "@/lib/toast";
 import { clsx } from "@/lib/clsx";
@@ -241,7 +242,9 @@ const ContractorRow = ({ contractor: ct, rank, module, isChosen, onSelect }: Row
         </div>
       </div>
       <div className="text-right">
-        <div className="font-serif text-lg font-bold text-navy">{formatCHF(ct.price)}</div>
+        <div className="font-serif text-lg font-bold text-navy">
+          {formatCHF(priceFor(ct, module))}
+        </div>
         <div className={clsx("text-[11px]", ct.priceDelta <= 0 ? "text-emerald" : "text-warning")}>
           {ct.priceDelta <= 0 ? ct.priceDelta : `+${ct.priceDelta}`}% vs. market avg.
         </div>

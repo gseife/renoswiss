@@ -29,6 +29,17 @@ const OIL_BOILER_SFH: Building = {
   heatingAge: 25,
 };
 
+const ZH_BASE = {
+  heritageBlock: false,
+  heritageObject: null,
+  heritageDistanceM: null,
+  districtHeatAvailable: false,
+  geothermalZone: null,
+  canton: "ZH",
+  bfsGemeindeNr: 9,
+  currentHeatingFossil: false,
+} as const;
+
 const RENOSWISS_GATED: Eligibility = {
   heatingRecentlyRenewed: true,
   dhwRecentlyRenewed: true,
@@ -36,6 +47,7 @@ const RENOSWISS_GATED: Eligibility = {
   installedPvKw: 9.9,
   heatingRenewedYear: 2023,
   roofPvPotentialKw: 15.8,
+  ...ZH_BASE,
 };
 
 const NO_GATES: Eligibility = {
@@ -45,6 +57,7 @@ const NO_GATES: Eligibility = {
   installedPvKw: 0,
   heatingRenewedYear: null,
   roofPvPotentialKw: null,
+  ...ZH_BASE,
 };
 
 const STATIC = "STATIC FALLBACK";

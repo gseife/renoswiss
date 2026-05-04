@@ -1,9 +1,10 @@
 import { MODULES } from "@/data/modules";
 import { SUBSIDIES } from "@/data/subsidies";
 import { BANKS } from "@/data/banks";
-import type { Contractor, Module, ModuleId } from "@/data/types";
+import type { Contractor, Module, ModuleId, Subsidy } from "@/data/types";
 import type { FinanceState } from "./store";
 import { calcAffordability, calcFinance, priceBankOffer } from "./finance";
+import { priceFor } from "./gis/contractorPricing";
 
 export interface PlanTotals {
   totalCost: number;
@@ -27,14 +28,16 @@ export const computeTotals = (
   selectedModules: ModuleId[],
   selectedContractors: Partial<Record<ModuleId, Contractor>>,
   modules: Module[] = MODULES,
+  subsidies: Subsidy[] = SUBSIDIES,
 ): PlanTotals => {
   const totalCost = selectedModules.reduce((s, id) => {
-    const ct = selectedContractors[id];
     const mod = modules.find((m) => m.id === id);
-    return s + (ct ? ct.price : (mod?.estCost ?? 0));
+    if (!mod) return s;
+    const ct = selectedContractors[id];
+    return s + (ct ? priceFor(ct, mod) : mod.estCost);
   }, 0);
 
-  const totalSubsidies = SUBSIDIES.reduce((s, sub) => s + sub.amount, 0);
+  const totalSubsidies = subsidies.reduce((s, sub) => s + sub.amount, 0);
   const netFinancing = Math.max(0, totalCost - totalSubsidies);
 
   const annualEnergySaving = selectedModules.reduce(

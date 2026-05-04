@@ -1,4 +1,4 @@
-import { AlertTriangle, MapPin, Calendar, Flame, Layers, AppWindow, Home, Box, CheckCircle2, Sun } from "lucide-react";
+import { AlertTriangle, MapPin, Calendar, Flame, Layers, AppWindow, Home, Box, CheckCircle2, Sun, ShieldAlert, Flame as FlameIcon, Mountain } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Stat } from "@/components/ui/Stat";
 import { GeakBar } from "@/components/ui/GeakBar";
@@ -101,7 +101,7 @@ export const BuildingProfile = () => {
         </div>
       </Card>
 
-      {eligibility && (eligibility.heatingRecentlyRenewed || eligibility.dhwRecentlyRenewed || eligibility.pvAlreadyInstalled) && (
+      {eligibility && hasAnyChip(eligibility) && (
         <div className="mt-4 flex flex-wrap gap-2">
           {eligibility.heatingRecentlyRenewed && (
             <Chip
@@ -122,6 +122,31 @@ export const BuildingProfile = () => {
               icon={Sun}
               tone="gold"
               label={`${eligibility.installedPvKw.toFixed(1)} kWp PV already installed`}
+            />
+          )}
+          {eligibility.heritageBlock && (
+            <Chip
+              icon={ShieldAlert}
+              tone="danger"
+              label={
+                eligibility.heritageObject
+                  ? `Heritage: ${eligibility.heritageObject.objekt} — façade gated`
+                  : "Heritage-protected — façade gated"
+              }
+            />
+          )}
+          {eligibility.districtHeatAvailable && (
+            <Chip
+              icon={FlameIcon}
+              tone="teal"
+              label="District-heat suitability area at this address"
+            />
+          )}
+          {eligibility.geothermalZone && (
+            <Chip
+              icon={Mountain}
+              tone="teal"
+              label={`Geothermal zone ${eligibility.geothermalZone}`}
             />
           )}
         </div>
@@ -172,19 +197,29 @@ export const BuildingProfile = () => {
   );
 };
 
+const hasAnyChip = (e: import("@/lib/gis/mapper").Eligibility): boolean =>
+  e.heatingRecentlyRenewed ||
+  e.dhwRecentlyRenewed ||
+  e.pvAlreadyInstalled ||
+  e.heritageBlock ||
+  e.districtHeatAvailable ||
+  e.geothermalZone != null;
+
 const Chip = ({
   icon: Icon,
   tone,
   label,
 }: {
   icon: typeof MapPin;
-  tone: "emerald" | "gold";
+  tone: "emerald" | "gold" | "teal" | "danger";
   label: string;
 }) => {
-  const toneClass =
-    tone === "emerald"
-      ? "border-emerald/30 bg-emerald/5 text-emerald"
-      : "border-gold/30 bg-[#FFFDF5] text-gold";
+  const toneClass = {
+    emerald: "border-emerald/30 bg-emerald/5 text-emerald",
+    gold: "border-gold/30 bg-[#FFFDF5] text-gold",
+    teal: "border-teal/30 bg-teal/5 text-teal",
+    danger: "border-danger/30 bg-danger/5 text-danger",
+  }[tone];
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-medium ${toneClass}`}
