@@ -33,11 +33,88 @@ import {
 } from "@/lib/derived";
 import { calcFinance } from "@/lib/finance";
 import { clsx } from "@/lib/clsx";
-import type { ModuleId } from "@/data/types";
+import type { Building, ModuleId } from "@/data/types";
+import type { Eligibility } from "@/lib/gis/mapper";
 
 const PROJECTION_YEARS = 15;
+/** Typical residential heating-system lifespan, in years. Below this
+ * threshold no forced replacement is expected within the projection. */
+const HEATING_LIFESPAN = 20;
 
 type BookingMode = "order" | "callback";
+
+interface ForcedReplacement {
+  label: string;
+  cost: number;
+}
+
+/**
+ * The "do nothing" cost of letting the existing heating system age out
+ * within the projection window. Returns null when no forced replacement
+ * applies — e.g. a Fernwärme connection (no on-site boiler), a recently
+ * renewed system (lifespan clock just reset), or a system that won't
+ * reach end-of-life inside `years` years. Cost and label adapt to the
+ * actual heating type so the baseline tells the truth for each building.
+ */
+const forcedReplacementFor = (
+  building: Building,
+  eligibility: Eligibility | null,
+  years: number,
+): ForcedReplacement | null => {
+  const heating = building.heating;
+
+  // No on-site boiler: building is on a district-heat network, the
+  // network operator handles their own assets.
+  if (heating.includes("Fernwärme")) return null;
+
+  // Recently-renewed: the existing system has at least `HEATING_LIFESPAN`
+  // years left, so nothing forced inside the projection window.
+  if (eligibility?.heatingRecentlyRenewed) return null;
+
+  // Won't age out inside the projection: the existing system still has
+  // years on its clock, even if not "new".
+  if (building.heatingAge + years < HEATING_LIFESPAN) return null;
+
+  const kw = heatingCapacityKw(building);
+
+  if (heating.includes("Wärmepumpe")) {
+    return {
+      label: "Forced heat-pump renewal (lifespan exceeded)",
+      cost: Math.round(8_000 + 1_900 * kw),
+    };
+  }
+
+  if (heating.includes("Solar")) {
+    return {
+      label: "Solar-thermal system renewal (lifespan exceeded)",
+      cost: 12_000,
+    };
+  }
+
+  // Direct electric: most cantons no longer permit new resistance heat,
+  // so the realistic forced path is a HP retrofit when it ages out.
+  if (heating.includes("Elektro")) {
+    return {
+      label: "Forced HP retrofit (electric heating phase-out)",
+      cost: Math.round(15_000 + 2_500 * kw),
+    };
+  }
+
+  if (heating.includes("Holz")) {
+    return {
+      label: "Forced wood-boiler replacement (lifespan exceeded)",
+      cost: Math.round(8_000 + 1_500 * kw),
+    };
+  }
+
+  // Fossil (oil / gas / coal): the original case. MuKEn 2025 + cantonal
+  // phase-outs may push this toward a forced HP retrofit by then; the
+  // figure below is the conservative like-for-like estimate.
+  return {
+    label: "Forced boiler replacement (lifespan exceeded)",
+    cost: Math.round(5_000 + 1_400 * kw),
+  };
+};
 
 export const Summary = () => {
   useDocumentTitle("Step 7 — Summary");
@@ -87,7 +164,14 @@ export const Summary = () => {
     );
   }
 
-  const totals = computeTotals(selectedModules, selectedContractors, modules, subsidies);
+  const geakCtx = { currentGeak: building.geakClass, eligibility };
+  const totals = computeTotals(
+    selectedModules,
+    selectedContractors,
+    modules,
+    subsidies,
+    geakCtx,
+  );
   const activeOffer = resolveActiveOffer(finance, totals, {
     building,
     selectedModules,
@@ -103,6 +187,7 @@ export const Summary = () => {
     selectedContractors,
     modules,
     subsidies,
+    geakCtx,
   );
 
   const trees = treesEquivalent(totals.annualCO2Saving);
@@ -111,10 +196,10 @@ export const Summary = () => {
   // building rather than flat:
   //  1. Energy bills compounded at the BFS LIK fuel-price trend (~1.5%/yr)
   //     over the projection window.
-  //  2. Forced boiler swap when the existing one ages out — sized to the
-  //     building's heat demand at CHF 1,400/kW + CHF 5,000 base (oil/gas
-  //     swap; HP-equivalent would actually cost more but isn't the
-  //     "do nothing" option).
+  //  2. Forced replacement of the heating system when it ages out.
+  //     The label and cost adapt to what's actually installed (boiler,
+  //     heat pump, wood, electric); buildings on Fernwärme or recently
+  //     renewed systems skip this row entirely.
   //  3. Property-value erosion as MuKEn 2025 tightens — bigger drag on
   //     low GEAK letters (G/F lose ~8%, D ~4%, A/B negligible).
   const ENERGY_INFLATION = 0.015;
@@ -125,8 +210,10 @@ export const Summary = () => {
     return Math.round(annual * ((Math.pow(1 + r, years) - 1) / r));
   };
   const energyOver15 = compoundedEnergyCost(building.annualCost, PROJECTION_YEARS);
-  const boilerReplacement = Math.round(
-    5_000 + 1_400 * heatingCapacityKw(building),
+  const forcedReplacement = forcedReplacementFor(
+    building,
+    eligibility,
+    PROJECTION_YEARS,
   );
   const valueErosionPctByGeak: Record<string, number> = {
     G: 0.09,
@@ -139,7 +226,26 @@ export const Summary = () => {
   };
   const valueErosionPct = valueErosionPctByGeak[building.geakClass] ?? 0.05;
   const valueErosion = Math.round(building.estimatedValue * valueErosionPct);
-  const doNothingCost = energyOver15 + boilerReplacement + valueErosion;
+  const doNothingCost =
+    energyOver15 + (forcedReplacement?.cost ?? 0) + valueErosion;
+
+  // Ancillary project costs the contractor invoices don't capture but
+  // a homeowner still has to budget for. Kept separate from totals.totalCost
+  // so the loan / GIS pricing flow stays driven by module spend; surfaced
+  // here so the user sees the all-in number before signing.
+  //  - Relocation: heat-pump + electrical phase typically forces a ~10-day
+  //    move-out (Timeline.tsx). Serviced-flat rate ~CHF 220/night in ZH.
+  //  - Permits & engineering: cantonal building permit, structural
+  //    engineer, GEAK Plus follow-ups — roughly 2.5% of build spend.
+  //  - Contingency: industry-standard 5% buffer for unknowns uncovered
+  //    once walls are open.
+  const relocationDays =
+    selectedModules.includes("heating") || selectedModules.includes("electrical") ? 10 : 0;
+  const relocationCost = relocationDays * 220;
+  const permitsCost = Math.round(totals.totalCost * 0.025);
+  const contingencyCost = Math.round(totals.totalCost * 0.05);
+  const ancillariesTotal = relocationCost + permitsCost + contingencyCost;
+  const allInProjectCost = totals.totalCost + ancillariesTotal;
 
   const renoLoan = activeOffer?.renovationLoan ?? totals.netFinancing;
   const renoRate = activeOffer?.rate ?? ESTIMATE_RATE;
@@ -184,6 +290,12 @@ export const Summary = () => {
           <Stat value={formatCHF(totals.annualEnergySaving)} label="Annual savings" tone="mint" size="lg" />
           <Stat value={`−${totals.annualCO2Saving.toFixed(1)} t`} label="CO₂ per year" tone="gold" size="lg" />
         </div>
+        <p className="mt-4 text-[10px] leading-relaxed text-white/60">
+          Indicative figures only. Energy savings, GEAK letter and CO₂ reduction are
+          modelled estimates based on Spring 2026 ZH market rates and BFS energy
+          tariffs — actual values depend on the GEAK Plus audit, contractor offers
+          and your usage profile.
+        </p>
       </Card>
 
       {/* CO₂ trees-equivalent widget */}
@@ -198,7 +310,7 @@ export const Summary = () => {
             </div>
             <p className="text-xs text-muted">
               Each mature tree absorbs ~21 kg of CO₂ per year. Your renovation has the same
-              annual climate impact as a small forest.
+              annual climate impact as {forestComparison(trees)}.
             </p>
           </div>
         </Card>
@@ -292,7 +404,36 @@ export const Summary = () => {
       <Card className="mt-3 p-5">
         <h3 className="mb-3 font-serif text-base font-bold text-navy">Financing</h3>
         <dl className="space-y-2 text-sm">
-          <SummaryLine label="Total renovation cost" value={formatCHF(totals.totalCost)} bold />
+          <SummaryLine label="Renovation works (modules)" value={formatCHF(totals.totalCost)} bold />
+          {ancillariesTotal > 0 && (
+            <div className="rounded-lg border border-line bg-canvas/40 px-3 py-2 text-[12px]">
+              <div className="mb-1.5 flex items-baseline justify-between font-semibold text-navy">
+                <span>Project ancillaries</span>
+                <span>{formatCHF(ancillariesTotal)}</span>
+              </div>
+              <ul className="space-y-1 text-muted">
+                {relocationCost > 0 && (
+                  <li className="flex items-baseline justify-between gap-3">
+                    <span>Temporary relocation (~{relocationDays} nights, heat-pump phase)</span>
+                    <span className="text-ink">{formatCHF(relocationCost)}</span>
+                  </li>
+                )}
+                <li className="flex items-baseline justify-between gap-3">
+                  <span>Permits, engineering &amp; GEAK Plus follow-up (~2.5%)</span>
+                  <span className="text-ink">{formatCHF(permitsCost)}</span>
+                </li>
+                <li className="flex items-baseline justify-between gap-3">
+                  <span>Contingency buffer (~5%)</span>
+                  <span className="text-ink">{formatCHF(contingencyCost)}</span>
+                </li>
+              </ul>
+            </div>
+          )}
+          <SummaryLine
+            label="All-in project cost"
+            value={formatCHF(allInProjectCost)}
+            bold
+          />
           <SummaryLine
             label="Subsidies (pre-qualified)"
             value={`− ${formatCHF(totals.totalSubsidies)}`}
@@ -353,6 +494,11 @@ export const Summary = () => {
             bank in the Calculator step to lock in a real offer.
           </p>
         )}
+        <p className="mt-3 text-[10px] leading-relaxed text-muted">
+          Costs and rates are approximate and reflect current Swiss market conditions.
+          Subsidies depend on cantonal program eligibility and are confirmed only after the
+          GEAK Plus audit. Final loan terms come from the bank's underwriting.
+        </p>
       </Card>
 
       {/* "Do nothing" baseline */}
@@ -368,7 +514,12 @@ export const Summary = () => {
             label={`Energy bills (${formatCHF(building.annualCost)}/yr, +1.5%/yr × ${PROJECTION_YEARS} yrs)`}
             value={formatCHF(energyOver15)}
           />
-          <BaselineRow label="Forced boiler replacement (lifespan exceeded)" value={formatCHF(boilerReplacement)} />
+          {forcedReplacement && (
+            <BaselineRow
+              label={forcedReplacement.label}
+              value={formatCHF(forcedReplacement.cost)}
+            />
+          )}
           <BaselineRow
             label="Property value erosion as energy standards tighten"
             value={formatCHF(valueErosion)}
@@ -471,6 +622,22 @@ export const Summary = () => {
       )}
     </>
   );
+};
+
+/**
+ * Climate-impact comparison sized to the number of mature trees the
+ * annual CO₂ saving offsets. Small impacts get a recognisable
+ * neighbourhood reference; from ~200 trees up we switch to football
+ * fields of forest (UEFA-standard pitch ≈ 0.7 ha at ~400 mature trees
+ * per pitch) so the magnitude lands intuitively.
+ */
+const forestComparison = (trees: number): string => {
+  if (trees < 15) return "a small backyard's worth of trees";
+  if (trees < 50) return "a tree-lined street";
+  if (trees < 120) return "a city park";
+  if (trees < 220) return "half a football field of forest";
+  const fields = Math.max(1, Math.round(trees / 400));
+  return `${fields} football field${fields === 1 ? "" : "s"} of forest`;
 };
 
 const formatLongDate = (iso: string | null) => {

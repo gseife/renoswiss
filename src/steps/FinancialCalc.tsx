@@ -76,6 +76,24 @@ export const FinancialCalc = () => {
     [finance.grossIncome, propertyValueAfter, totalMortgage],
   );
 
+  // Tragbarkeit anchor: the gross income required to land at the 33%
+  // approval line, given the current loan + property. Independent of the
+  // user's current income input (so no circular feedback). The income
+  // slider's min/max key off this so the user can always slide into a
+  // feasible zone — high renovation cost pushes the slider's centre up.
+  const targetIncomeForApproval = Math.max(
+    60_000,
+    Math.ceil(affordability.imputedTotal / 0.33 / 5_000) * 5_000,
+  );
+  const incomeSliderMin = Math.max(
+    60_000,
+    Math.floor((targetIncomeForApproval * 0.5) / 5_000) * 5_000,
+  );
+  const incomeSliderMax = Math.max(
+    200_000,
+    Math.ceil((targetIncomeForApproval * 1.6) / 5_000) * 5_000,
+  );
+
   const offers = useMemo(
     () =>
       BANKS.map((bank) => ({
@@ -208,20 +226,22 @@ export const FinancialCalc = () => {
           <Slider
             label="Gross household income"
             value={`${formatCHF(finance.grossIncome)} / yr`}
-            min={60_000}
-            max={400_000}
+            min={incomeSliderMin}
+            max={incomeSliderMax}
             step={5_000}
-            val={finance.grossIncome}
+            val={Math.min(Math.max(finance.grossIncome, incomeSliderMin), incomeSliderMax)}
             onChange={(v) => updateFinance({ grossIncome: v })}
+            help={`~${formatCHF(targetIncomeForApproval)} clears the 33% Tragbarkeit line for this loan.`}
           />
           <Slider
             label="Current property value"
             value={formatCHF(finance.propertyValue)}
-            min={400_000}
-            max={3_000_000}
+            min={Math.max(50_000, Math.round((building.estimatedValue * 0.5) / 10_000) * 10_000)}
+            max={Math.round((building.estimatedValue * 1.5) / 10_000) * 10_000}
             step={10_000}
             val={finance.propertyValue}
             onChange={(v) => updateFinance({ propertyValue: v })}
+            help={`Centered on the GIS-derived estimate of ${formatCHF(building.estimatedValue)} (±50%).`}
           />
           <Slider
             label="Existing mortgage"
@@ -574,22 +594,49 @@ export const FinancialCalc = () => {
 
       {activeApproved && renovationLoan > 0 && schedule.length > 0 && (
         <Card className="mt-3 p-5">
-          <h3 className="mb-1 font-serif text-base font-bold text-navy">Amortisation schedule</h3>
+          <h3 className="mb-1 font-serif text-base font-bold text-navy">How the loan winds down</h3>
           <p className="mb-4 text-xs text-muted">
-            Each column is one year of the loan. Interest shrinks and principal grows as the
-            balance comes down.
+            Your annual payment stays the same, but the split shifts each year:
+            interest (paid to the bank) shrinks as the principal you've already
+            paid down grows. The navy line tracks your remaining balance.
           </p>
-          <ScheduleChart schedule={schedule} />
-          <div className="mt-3 flex items-center justify-center gap-4 text-[11px]">
+          <ScheduleChart schedule={schedule} principal={renovationLoan} />
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px]">
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block h-2 w-3 rounded-sm bg-teal" />
-              Principal
+              Principal paid
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block h-2 w-3 rounded-sm bg-warning/80" />
-              Interest
+              Interest paid
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-0.5 w-3 rounded-sm bg-navy" />
+              Remaining balance
             </span>
           </div>
+          {(() => {
+            const crossover = schedule.find((s) => s.principal > s.interest);
+            const totalInterest = schedule.reduce((s, y) => s + y.interest, 0);
+            return (
+              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3 text-[11px]">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted">
+                    Principal &gt; interest from
+                  </div>
+                  <div className="mt-0.5 font-bold text-navy">
+                    {crossover ? `Year ${crossover.year}` : "Never within term"}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-wider text-muted">
+                    Total interest over {finance.term} yrs
+                  </div>
+                  <div className="mt-0.5 font-bold text-navy">{formatCHF(totalInterest)}</div>
+                </div>
+              </div>
+            );
+          })()}
         </Card>
       )}
 
@@ -797,19 +844,67 @@ const Gauge = ({
   );
 };
 
+/**
+ * Stacked-area amortisation chart. The total height per year is the
+ * (constant) annuity payment, split into the principal portion (teal,
+ * grows over time) and the interest portion (warning, shrinks). A navy
+ * line on top tracks the remaining balance, scaled to the same
+ * vertical range so it visibly drops to zero at the end of the term.
+ */
 const ScheduleChart = ({
   schedule,
+  principal,
 }: {
-  schedule: { year: number; interest: number; principal: number }[];
+  schedule: { year: number; interest: number; principal: number; balance: number }[];
+  principal: number;
 }) => {
-  const width = 320;
-  const height = 140;
-  const pad = { top: 8, right: 8, bottom: 22, left: 8 };
+  const width = 400;
+  const height = 180;
+  const pad = { top: 14, right: 12, bottom: 26, left: 44 };
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
-  const max = Math.max(...schedule.map((s) => s.interest + s.principal));
-  const colW = innerW / schedule.length;
-  const gap = Math.min(2, colW * 0.15);
+
+  const annualPayment =
+    schedule.length > 0 ? schedule[0].interest + schedule[0].principal : 0;
+  const N = schedule.length;
+  const xAt = (i: number) => pad.left + (N === 1 ? innerW / 2 : (i / (N - 1)) * innerW);
+
+  // Stacked split: principal fills from the bottom; interest stacks above.
+  const splitY = (i: number) =>
+    pad.top + innerH * (1 - schedule[i].principal / annualPayment);
+
+  const principalPath = [
+    `M ${xAt(0)} ${pad.top + innerH}`,
+    ...schedule.map((_, i) => `L ${xAt(i)} ${splitY(i)}`),
+    `L ${xAt(N - 1)} ${pad.top + innerH}`,
+    "Z",
+  ].join(" ");
+  const interestPath = [
+    `M ${xAt(0)} ${pad.top}`,
+    ...schedule.map((_, i) => `L ${xAt(i)} ${splitY(i)}`),
+    `L ${xAt(N - 1)} ${pad.top}`,
+    "Z",
+  ].join(" ");
+
+  // Balance line: principal at year 0 (full loan) → schedule[N-1].balance ≈ 0.
+  const balanceY = (b: number) =>
+    pad.top + innerH * (1 - b / Math.max(principal, 1));
+  const balancePoints = [
+    `${pad.left} ${balanceY(principal)}`,
+    ...schedule.map((s, i) => `${xAt(i)} ${balanceY(s.balance)}`),
+  ].join(" ");
+
+  // Y-axis: show the constant annual payment at top, mid, and zero.
+  const yTicks = [
+    { v: annualPayment, label: shortCHF(annualPayment) },
+    { v: annualPayment / 2, label: shortCHF(annualPayment / 2) },
+    { v: 0, label: "0" },
+  ];
+
+  // X-axis ticks: year 1 + every 5 years + final year.
+  const xTickIdx = schedule
+    .map((_, i) => i)
+    .filter((i) => i === 0 || i === N - 1 || (i + 1) % 5 === 0);
 
   return (
     <svg
@@ -818,40 +913,64 @@ const ScheduleChart = ({
       role="img"
       aria-label="Amortisation schedule by year"
     >
-      {schedule.map((s, i) => {
-        const total = s.interest + s.principal;
-        const h = (total / max) * innerH;
-        const principalH = (s.principal / total) * h;
-        const interestH = h - principalH;
-        const x = pad.left + i * colW + gap / 2;
-        const y = pad.top + (innerH - h);
-        const w = colW - gap;
+      {/* Horizontal grid lines + y-axis labels */}
+      {yTicks.map(({ v, label }) => {
+        const y = pad.top + innerH * (1 - v / annualPayment);
         return (
-          <g key={s.year}>
-            <rect x={x} y={y} width={w} height={principalH} className="fill-teal" rx={1} />
-            <rect
-              x={x}
-              y={y + principalH}
-              width={w}
-              height={interestH}
-              className="fill-warning/80"
-              rx={1}
+          <g key={label}>
+            <line
+              x1={pad.left}
+              y1={y}
+              x2={pad.left + innerW}
+              y2={y}
+              className="stroke-line"
+              strokeDasharray="2 3"
             />
-            {(i === 0 || i === schedule.length - 1 || (i + 1) % 5 === 0) && (
-              <text
-                x={x + w / 2}
-                y={height - 6}
-                textAnchor="middle"
-                className="fill-muted text-[9px]"
-              >
-                Y{s.year}
-              </text>
-            )}
+            <text
+              x={pad.left - 6}
+              y={y + 3}
+              textAnchor="end"
+              className="fill-muted text-[8px]"
+            >
+              {label}
+            </text>
           </g>
         );
       })}
+
+      {/* Stacked areas */}
+      <path d={principalPath} className="fill-teal" />
+      <path d={interestPath} className="fill-warning/80" />
+
+      {/* Balance line overlay */}
+      <polyline
+        points={balancePoints}
+        fill="none"
+        className="stroke-navy"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+
+      {/* X-axis year labels */}
+      {xTickIdx.map((i) => (
+        <text
+          key={i}
+          x={xAt(i)}
+          y={height - 8}
+          textAnchor="middle"
+          className="fill-muted text-[9px]"
+        >
+          Y{schedule[i].year}
+        </text>
+      ))}
     </svg>
   );
+};
+
+/** Compact CHF formatter for axis labels. */
+const shortCHF = (n: number): string => {
+  if (n >= 1000) return `${Math.round(n / 100) / 10}k`;
+  return `${Math.round(n)}`;
 };
 
 const Line = ({
@@ -911,6 +1030,7 @@ const Slider = ({
   step,
   val,
   onChange,
+  help,
 }: {
   label: React.ReactNode;
   value: string;
@@ -919,6 +1039,7 @@ const Slider = ({
   step: number;
   val: number;
   onChange: (v: number) => void;
+  help?: string;
 }) => (
   <div>
     <div className="mb-1.5 flex items-baseline justify-between text-xs">
@@ -934,5 +1055,6 @@ const Slider = ({
       onChange={(e) => onChange(+e.target.value)}
       aria-label={typeof label === "string" ? label : undefined}
     />
+    {help && <div className="mt-1 text-[10px] text-muted">{help}</div>}
   </div>
 );

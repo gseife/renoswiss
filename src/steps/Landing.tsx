@@ -1682,10 +1682,13 @@ const ResumePill = ({
   onReset: () => void;
   onDismiss: () => void;
 }) => {
-  const { selectedModules, selectedContractors } = useStore();
+  const { selectedModules, selectedContractors, building, eligibility } = useStore();
   const modules = useScaledModules();
   const subsidies = useSubsidies();
-  const totals = computeTotals(selectedModules, selectedContractors, modules, subsidies);
+  const totals = computeTotals(selectedModules, selectedContractors, modules, subsidies, {
+    currentGeak: building.geakClass,
+    eligibility,
+  });
   return (
     <div className="fixed bottom-5 right-5 z-50 flex max-w-[340px] items-center gap-3 rounded-2xl border border-line bg-white/90 p-3 pl-4 shadow-card backdrop-blur-xl">
       <div className="min-w-0">

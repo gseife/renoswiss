@@ -219,8 +219,10 @@ export const StartAnalysis = () => {
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center bg-gradient-to-b from-white via-surface to-canvas px-6 py-20">
       <div className="w-full max-w-xl text-center">
-        <Logo size="lg" />
-        <div className="mx-auto mt-8 inline-flex items-center gap-2 rounded-full border border-line bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-teal backdrop-blur">
+        <div className="flex justify-center">
+          <Logo size="lg" />
+        </div>
+        <div className="mx-auto mt-8 flex w-fit items-center gap-2 rounded-full border border-line bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-teal backdrop-blur">
           <span className="h-1.5 w-1.5 rounded-full bg-teal" />
           Free · Two minutes
         </div>

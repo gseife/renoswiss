@@ -5,22 +5,29 @@ interface BankLogoProps {
   size?: number;
 }
 
+/**
+ * Bank wordmarks loaded from public/banks/{id}.svg. Files are the
+ * canonical SVG logos hosted on Wikimedia Commons; rendered in a wide
+ * rectangle on white so the brand reads at a glance in the offer list.
+ */
 export const BankLogo = ({ bank, size = 40 }: BankLogoProps) => {
-  const fontSize = bank.monogram.length === 1 ? size * 0.55 : size * 0.36;
+  const src = `${import.meta.env.BASE_URL}banks/${bank.id}.svg`;
   return (
     <div
-      className="grid shrink-0 place-items-center rounded-md font-serif font-bold tracking-tight"
+      className="grid shrink-0 place-items-center overflow-hidden rounded-md border border-line bg-white"
       style={{
-        background: bank.bg,
-        color: bank.fg,
-        width: size,
+        width: size * 2,
         height: size,
-        fontSize,
-        letterSpacing: bank.monogram.length === 1 ? 0 : "-0.02em",
       }}
       aria-label={`${bank.name} logo`}
     >
-      {bank.monogram}
+      <img
+        src={src}
+        alt={bank.name}
+        className="block max-h-full max-w-full"
+        style={{ padding: size * 0.12, objectFit: "contain" }}
+        draggable={false}
+      />
     </div>
   );
 };

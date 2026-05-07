@@ -4,6 +4,7 @@ import { BANKS } from "@/data/banks";
 import type { Building, Contractor, Module, ModuleId, Subsidy } from "@/data/types";
 import type { FinanceState } from "./store";
 import type { Eligibility } from "./gis/mapper";
+import type { GeakClass } from "./gis/condition";
 import { calcAffordability, calcFinance, priceBankOffer } from "./finance";
 import { priceFor } from "./gis/contractorPricing";
 import { targetGeakFor } from "./gis/geakTarget";
@@ -27,11 +28,17 @@ export const ESTIMATE_RATE = 1.85;
 export const ESTIMATE_TERM = 15;
 export const ESTIMATE_TAX_RATE = 25;
 
+export interface GeakContext {
+  currentGeak: GeakClass;
+  eligibility: Eligibility | null;
+}
+
 export const computeTotals = (
   selectedModules: ModuleId[],
   selectedContractors: Partial<Record<ModuleId, Contractor>>,
   modules: Module[] = MODULES,
   subsidies: Subsidy[] = SUBSIDIES,
+  geakCtx?: GeakContext,
 ): PlanTotals => {
   const totalCost = selectedModules.reduce((s, id) => {
     const mod = modules.find((m) => m.id === id);
@@ -62,16 +69,26 @@ export const computeTotals = (
     annualEnergySaving,
   });
 
-  // GEAK improvement: rough heuristic — F → E/D/C/B based on coverage of critical envelope+heating modules
-  const envelopeIds: ModuleId[] = ["facade", "roof", "windows", "basement"];
-  const envelopeScore = envelopeIds.filter((id) => selectedModules.includes(id)).length;
-  const hasHeating = selectedModules.includes("heating");
-  let target = "F";
-  if (hasHeating && envelopeScore >= 3) target = "B";
-  else if (hasHeating && envelopeScore >= 2) target = "C";
-  else if (hasHeating || envelopeScore >= 2) target = "D";
-  else if (envelopeScore >= 1) target = "E";
-  const geakImprovement = `F → ${target}`;
+  // GEAK improvement: when we know the building's current letter and
+  // eligibility flags, defer to targetGeakFor (matches FinancialCalc's
+  // valuation-uplift logic). Otherwise fall back to a coverage heuristic
+  // anchored at F so generic callers (Sidebar before address lookup) still
+  // produce a useful display.
+  let geakImprovement: string;
+  if (geakCtx) {
+    const target = targetGeakFor(geakCtx.currentGeak, selectedModules, geakCtx.eligibility);
+    geakImprovement = `${geakCtx.currentGeak} → ${target}`;
+  } else {
+    const envelopeIds: ModuleId[] = ["facade", "roof", "windows", "basement"];
+    const envelopeScore = envelopeIds.filter((id) => selectedModules.includes(id)).length;
+    const hasHeating = selectedModules.includes("heating");
+    let target = "F";
+    if (hasHeating && envelopeScore >= 3) target = "B";
+    else if (hasHeating && envelopeScore >= 2) target = "C";
+    else if (hasHeating || envelopeScore >= 2) target = "D";
+    else if (envelopeScore >= 1) target = "E";
+    geakImprovement = `F → ${target}`;
+  }
 
   const contractorsChosen = selectedModules.filter((id) => selectedContractors[id]).length;
 

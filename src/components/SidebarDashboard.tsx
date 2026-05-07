@@ -6,10 +6,13 @@ import { computeTotals } from "@/lib/derived";
 import { formatCHF } from "@/lib/format";
 
 export const SidebarDashboard = () => {
-  const { selectedModules, selectedContractors } = useStore();
+  const { selectedModules, selectedContractors, building, eligibility } = useStore();
   const modules = useScaledModules();
   const subsidies = useSubsidies();
-  const t = computeTotals(selectedModules, selectedContractors, modules, subsidies);
+  const t = computeTotals(selectedModules, selectedContractors, modules, subsidies, {
+    currentGeak: building.geakClass,
+    eligibility,
+  });
 
   const fillPct = t.modulesTotal > 0 ? (t.modulesSelected / t.modulesTotal) * 100 : 0;
 
